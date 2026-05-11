@@ -1,0 +1,36 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+coverage.out
+coverage.html
+
+# Build artifacts
+/bin/
+/build/
+/dist/
+
+# Accidental example binaries built at repo root (e.g. `go build ./examples/echo/`)
+/echo
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+*.iml
+
+# Local settings (per global CLAUDE.md mandate)
+.claude/settings.local.json
+
+# Local environment
+.env
+.env.*
+!.env.example
