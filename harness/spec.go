@@ -42,6 +42,10 @@ type StateShape struct {
 // the developer and consumed by the harness at NewImp / Run.
 //
 // Validation runs at NewImp; the error returned names the offending field.
+//
+// Outbound subject permissioning is the substrate's concern (NATS account
+// ACLs on the connection), not the framework's. The spec does not declare
+// an outbound subject whitelist.
 type ImpSpec struct {
 	Name      string
 	Version   string
@@ -49,32 +53,27 @@ type ImpSpec struct {
 	Awareness AwarenessFn
 	Reasoning ReasoningFn
 	States    []StateShape
-	Actions   []string
 	OnNote    func(entity Entity, payload any)
 }
 
-// ImpIdentity is the triple that identifies a running imp instance.
-// SubjectPrefix is the fully-resolved prefix used for channel subscriptions
-// and action publishes (mode-resolved).
+// ImpIdentity identifies a running imp instance.
 type ImpIdentity struct {
-	Name          string
-	Version       string
-	SubjectPrefix string
+	Name    string
+	Version string
 }
 
 // Metrics is a non-resetting snapshot of harness counters. All values are
 // monotonic across the lifetime of the imp except InflightReasoning, which
 // is a gauge.
 type Metrics struct {
-	InflightReasoning   int64
-	DecodeFailures      uint64
-	ExtractionFailures  uint64
-	AwarenessPanics     uint64
-	ReasoningPanics     uint64
-	ReasoningErrors     uint64
-	WhitelistViolations uint64
-	NotesDelivered      uint64
-	WakesDispatched     uint64
-	IgnoredVerdicts     uint64
-	NakTotal            uint64
+	InflightReasoning  int64
+	DecodeFailures     uint64
+	ExtractionFailures uint64
+	AwarenessPanics    uint64
+	ReasoningPanics    uint64
+	ReasoningErrors    uint64
+	NotesDelivered     uint64
+	WakesDispatched    uint64
+	IgnoredVerdicts    uint64
+	NakTotal           uint64
 }

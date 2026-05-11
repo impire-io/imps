@@ -1,6 +1,7 @@
 // Echo is the worked example from specs/001-harness-core/quickstart.md.
 // It subscribes to messages.in, awareness always wakes, reasoning publishes
-// the payload back to actions.out under the configured prefix.
+// the payload back to actions.out — both on literal subjects, since the
+// framework performs no subject transformation.
 package main
 
 import (
@@ -42,11 +43,9 @@ func main() {
 			payload := []byte(reason.(string))
 			return r.Publish(ctx, "actions.out", payload)
 		},
-		Actions: []string{"actions.out"},
 	}
 
 	imp, err := harness.NewImp(spec, nc,
-		harness.WithSubjectPrefix("tenant.demo"),
 		harness.WithLogger(slog.NewTextHandler(os.Stdout, nil)),
 	)
 	if err != nil {

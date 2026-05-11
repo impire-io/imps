@@ -1,6 +1,6 @@
 # Quickstart: Author and Run an Imp
 
-This walks through building the smallest meaningful imp using the harness — one channel, one awareness function, one reasoning function, one action — and running it against an embedded NATS server. Everything below is what an imp author writes; the harness fills in subscription, dispatch, queueing, and lifecycle.
+This walks through building the smallest meaningful imp using the harness — one channel, one awareness function, one reasoning function, one outbound publish — and running it against an embedded NATS server. Everything below is what an imp author writes; the harness fills in subscription, dispatch, queueing, and lifecycle.
 
 ---
 
@@ -11,9 +11,7 @@ An "echo" imp:
 - Awareness sees every message and always returns `Wake` (this is the simplest path; a real awareness would inspect content first).
 - Reasoning publishes the message back out to subject `actions.out`.
 
-Resolved subjects under non-platform mode with prefix `tenant.demo`:
-- Channel subscription: `tenant.demo.messages.in`
-- Action publish: `tenant.demo.actions.out`
+The framework imposes no subject transformation — `messages.in` and `actions.out` are the literal subjects on the wire (constitution v2.2.0 "Imps see one subject path").
 
 ---
 
@@ -70,11 +68,9 @@ func main() {
             payload := []byte(reason.(string))
             return r.Publish(ctx, "actions.out", payload)
         },
-        Actions: []string{"actions.out"},
     }
 
     imp, err := harness.NewImp(spec, nc,
-        harness.WithSubjectPrefix("tenant.demo"),
         harness.WithLogger(slog.NewTextHandler(os.Stdout, nil)),
     )
     if err != nil {
@@ -90,7 +86,7 @@ func main() {
 }
 ```
 
-That's an entire imp. ~50 lines of declaration, no subscription code, no dispatch loop, no goroutine management, no whitelist enforcement code.
+That's an entire imp. ~50 lines of declaration, no subscription code, no dispatch loop, no goroutine management, no subject-prefix ceremony.
 
 ---
 
@@ -99,47 +95,50 @@ That's an entire imp. ~50 lines of declaration, no subscription code, no dispatc
 In a second terminal, with `nats-server` running locally:
 
 ```bash
-nats sub 'tenant.demo.actions.out'
+nats sub 'actions.out'
 ```
 
 In a third terminal:
 
 ```bash
-nats pub 'tenant.demo.messages.in' 'hello'
+nats pub 'messages.in' 'hello'
 ```
 
-The subscriber prints `hello`. The imp received the message on `tenant.demo.messages.in`, awareness returned `Wake`, reasoning published to `tenant.demo.actions.out`, and the subscriber saw the result.
+The subscriber prints `hello`. The imp received the message on `messages.in`, awareness returned `Wake`, reasoning published to `actions.out`, and the subscriber saw the result.
 
 ---
 
 ## What the harness did for you
 
 1. Validated the spec at `NewImp` (would have rejected a missing awareness function, duplicate state names, non-positive caps, etc.).
-2. Resolved `messages.in` → `tenant.demo.messages.in` and `actions.out` → `tenant.demo.actions.out` from the configured prefix.
-3. Established the NATS subscription on the resolved channel subject.
-4. On every message: invoked the decoder, then the entity extractor, then awareness — all synchronously.
-5. On `Wake`: returned to the substrate (the message is now "handled"), and queued reasoning in a fresh goroutine.
-6. In the reasoning goroutine: checked `actions.out` against the whitelist (in this case `["actions.out"]`), resolved the subject, and published.
-7. On `SIGINT`: cancelled the context, stopped accepting messages, waited up to 30 s for any in-flight reasoning to drain, unsubscribed cleanly.
+2. Established the NATS subscription on `messages.in` (verbatim).
+3. On every message: invoked the decoder, then the entity extractor, then awareness — all synchronously.
+4. On `Wake`: returned to the substrate (the message is now "handled"), and queued reasoning in a fresh goroutine.
+5. In the reasoning goroutine: published on `actions.out` (verbatim) via the NATS connection.
+6. On `SIGINT`: cancelled the context, stopped accepting messages, waited up to 30 s for any in-flight reasoning to drain, unsubscribed cleanly.
 
 ---
 
-## Switching to platform mode
+## Reaching a service in another account
 
-The same source runs in platform mode by replacing the option:
+Per the constitution's "Imps see one subject path" principle (v2.2.0), the imp's view of NATS subjects is the same single form regardless of where responders live. If a responder lives in a different NATS account, the operator configures an account *import* on the imp's account so the exported subject lands on whatever name the imp uses internally. The imp's source — and the harness — sees `knowledge.recall`; the substrate routes that through to the exporting account.
+
+No `WithPlatformMode`, no `WithSubjectPrefix`. The imp source and the harness API are topology-agnostic; cross-account routing is operator concern.
+
+---
+
+## Generic NATS clients in reasoning
+
+The `ReasoningContext` exposes `Conn() *nats.Conn`. Any downstream library that takes a `*nats.Conn` (an inference client, a knowledge client, a tool client) can be used from reasoning directly:
 
 ```go
-imp, err := harness.NewImp(spec, nc,
-    harness.WithSubjectPrefix("platform"),
-    harness.WithPlatformMode("ABCD1234EFGH"),  // importer account public key
-)
+spec.Reasoning = func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
+    client := inference.New(r.Conn())   // generic NATS-based client
+    return client.Prompt(ctx, "...")
+}
 ```
 
-Resolved subjects become:
-- Channel subscription: `platform.ABCD1234EFGH.messages.in`
-- Action publish: `platform.ABCD1234EFGH.actions.out`
-
-The imp's source code is identical. (User Story 7, SC-008.)
+Awareness has no `Conn()` method. A library that needs raw connection access cannot be invoked from awareness — the structural energy gradient holds.
 
 ---
 
@@ -193,8 +192,8 @@ spec.Channels = []harness.ChannelSpec{{
     Name: "orders",
     Source: harness.StreamSource{
         Stream:        "ORDERS",
-        FilterSubject: "orders.created",
-        Durable:       "echo-orders",  // omit for ephemeral
+        FilterSubject: "orders.created",  // literal — must match a subject the stream covers
+        Durable:       "echo-orders",     // omit for ephemeral
     },
     Decode:        decodeOrder,
     ExtractEntity: extractOrderID,
@@ -228,20 +227,24 @@ func TestEchoEndToEnd(t *testing.T) {
     t.Cleanup(func() { nc.Drain() })
 
     spec := buildEchoSpec()
-    imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+    imp, err := harness.NewImp(spec, nc)
     if err != nil { t.Fatal(err) }
 
     ctx, cancel := context.WithCancel(context.Background())
     t.Cleanup(cancel)
     go imp.Run(ctx)
 
-    received := make(chan []byte, 1)
-    nc.Subscribe("test.actions.out", func(m *nats.Msg) { received <- m.Data })
+    // Wait for startup to register subscriptions.
+    deadline := time.Now().Add(2 * time.Second)
+    for time.Now().Before(deadline) && !imp.Ready() {
+        time.Sleep(10 * time.Millisecond)
+    }
 
-    // wait for subscription to register before publishing
+    received := make(chan []byte, 1)
+    nc.Subscribe("actions.out", func(m *nats.Msg) { received <- m.Data })
     nc.Flush()
 
-    if err := nc.Publish("test.messages.in", []byte("hello")); err != nil {
+    if err := nc.Publish("messages.in", []byte("hello")); err != nil {
         t.Fatal(err)
     }
 
@@ -264,7 +267,7 @@ Once you have an echo imp running, the same shape extends:
 
 - More channels (subject and/or stream) — declare more entries in `Channels`.
 - More state shapes — declare more entries in `States`. Caps fail loudly when reached.
-- More actions — extend the whitelist; non-whitelist publishes return `ErrWhitelistViolation` at the call site.
-- Switch deployment modes by changing the option, not the code.
+- More outbound publishes — call `r.Publish(...)` from reasoning on any subject the substrate's ACLs permit. (No framework-side whitelist.)
+- Generic NATS-based clients — pull `r.Conn()` and pass it to any library that takes a `*nats.Conn`.
 
 Capability calls (inference, knowledge, tools), soulstream participation, sleep/wake, and persistence are separate features — they layer onto this shape without changing it.

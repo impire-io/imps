@@ -34,7 +34,6 @@ func echoSpec(awareness harness.AwarenessFn) harness.ImpSpec {
 			payload := []byte(reason.(string))
 			return r.Publish(ctx, "actions.out", payload)
 		},
-		Actions: []string{"actions.out"},
 	}
 }
 
@@ -47,10 +46,7 @@ func startImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harn
 	}
 	t.Cleanup(func() { nc.Close() })
 
-	defaultOpts := []harness.Option{harness.WithSubjectPrefix("test")}
-	defaultOpts = append(defaultOpts, opts...)
-
-	imp, err := harness.NewImp(spec, nc, defaultOpts...)
+	imp, err := harness.NewImp(spec, nc, opts...)
 	if err != nil {
 		t.Fatalf("NewImp: %v", err)
 	}
@@ -62,7 +58,7 @@ func startImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harn
 	// Allow Run to install runtime state and subscriptions.
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if imp.Identity().SubjectPrefix != "" {
+		if imp.Ready() {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -90,14 +86,14 @@ func TestEndToEndHappyPath(t *testing.T) {
 	defer cleanup()
 
 	got := make(chan []byte, 1)
-	if _, err := nc.Subscribe("test.actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
+	if _, err := nc.Subscribe("actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := nc.Publish("test.messages.in", []byte("hello")); err != nil {
+	if err := nc.Publish("messages.in", []byte("hello")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -133,7 +129,7 @@ func TestDecodeFailureSkipsAwareness(t *testing.T) {
 	defer cleanup()
 
 	got := make(chan []byte, 1)
-	if _, err := nc.Subscribe("test.actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
+	if _, err := nc.Subscribe("actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
@@ -141,14 +137,14 @@ func TestDecodeFailureSkipsAwareness(t *testing.T) {
 	}
 
 	// First message: decode fails. Awareness must NOT be invoked.
-	if err := nc.Publish("test.messages.in", []byte("bad")); err != nil {
+	if err := nc.Publish("messages.in", []byte("bad")); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	// Second message: decode succeeds.
-	if err := nc.Publish("test.messages.in", []byte("ok")); err != nil {
+	if err := nc.Publish("messages.in", []byte("ok")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -187,20 +183,20 @@ func TestExtractionFailureSkipsAwareness(t *testing.T) {
 	defer cleanup()
 
 	got := make(chan []byte, 1)
-	if _, err := nc.Subscribe("test.actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
+	if _, err := nc.Subscribe("actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := nc.Publish("test.messages.in", []byte("noentity")); err != nil {
+	if err := nc.Publish("messages.in", []byte("noentity")); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
 		t.Fatal(err)
 	}
-	if err := nc.Publish("test.messages.in", []byte("good")); err != nil {
+	if err := nc.Publish("messages.in", []byte("good")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -235,20 +231,20 @@ func TestAwarenessPanicRecovers(t *testing.T) {
 	defer cleanup()
 
 	got := make(chan []byte, 1)
-	if _, err := nc.Subscribe("test.actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
+	if _, err := nc.Subscribe("actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := nc.Publish("test.messages.in", []byte("panic")); err != nil {
+	if err := nc.Publish("messages.in", []byte("panic")); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
 		t.Fatal(err)
 	}
-	if err := nc.Publish("test.messages.in", []byte("after-panic")); err != nil {
+	if err := nc.Publish("messages.in", []byte("after-panic")); err != nil {
 		t.Fatal(err)
 	}
 

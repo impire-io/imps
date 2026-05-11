@@ -10,33 +10,31 @@ import "sync/atomic"
 // concurrently with dispatch; individual loads are atomic but the snapshot
 // is not transactionally consistent across counters.
 type metrics struct {
-	InflightReasoning   atomic.Int64
-	DecodeFailures      atomic.Uint64
-	ExtractionFailures  atomic.Uint64
-	AwarenessPanics     atomic.Uint64
-	ReasoningPanics     atomic.Uint64
-	ReasoningErrors     atomic.Uint64
-	WhitelistViolations atomic.Uint64
-	NotesDelivered      atomic.Uint64
-	WakesDispatched     atomic.Uint64
-	IgnoredVerdicts     atomic.Uint64
-	NakTotal            atomic.Uint64
+	InflightReasoning  atomic.Int64
+	DecodeFailures     atomic.Uint64
+	ExtractionFailures atomic.Uint64
+	AwarenessPanics    atomic.Uint64
+	ReasoningPanics    atomic.Uint64
+	ReasoningErrors    atomic.Uint64
+	NotesDelivered     atomic.Uint64
+	WakesDispatched    atomic.Uint64
+	IgnoredVerdicts    atomic.Uint64
+	NakTotal           atomic.Uint64
 }
 
 func newMetrics() *metrics { return &metrics{} }
 
 func (m *metrics) snapshot() Metrics {
 	return Metrics{
-		InflightReasoning:   m.InflightReasoning.Load(),
-		DecodeFailures:      m.DecodeFailures.Load(),
-		ExtractionFailures:  m.ExtractionFailures.Load(),
-		AwarenessPanics:     m.AwarenessPanics.Load(),
-		ReasoningPanics:     m.ReasoningPanics.Load(),
-		ReasoningErrors:     m.ReasoningErrors.Load(),
-		WhitelistViolations: m.WhitelistViolations.Load(),
-		NotesDelivered:      m.NotesDelivered.Load(),
-		WakesDispatched:     m.WakesDispatched.Load(),
-		IgnoredVerdicts:     m.IgnoredVerdicts.Load(),
-		NakTotal:            m.NakTotal.Load(),
+		InflightReasoning:  m.InflightReasoning.Load(),
+		DecodeFailures:     m.DecodeFailures.Load(),
+		ExtractionFailures: m.ExtractionFailures.Load(),
+		AwarenessPanics:    m.AwarenessPanics.Load(),
+		ReasoningPanics:    m.ReasoningPanics.Load(),
+		ReasoningErrors:    m.ReasoningErrors.Load(),
+		NotesDelivered:     m.NotesDelivered.Load(),
+		WakesDispatched:    m.WakesDispatched.Load(),
+		IgnoredVerdicts:    m.IgnoredVerdicts.Load(),
+		NakTotal:           m.NakTotal.Load(),
 	}
 }

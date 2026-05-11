@@ -33,7 +33,6 @@ This satisfies the spec's clarification Q3: "The harness MUST expose the current
 | `AwarenessPanics` | awareness panicked | per message (FR-015) |
 | `ReasoningPanics` | reasoning panicked | per reasoning invocation (FR-021) |
 | `ReasoningErrors` | reasoning returned non-nil error | per reasoning invocation (FR-021) |
-| `WhitelistViolations` | reasoning publish to off-whitelist subject | per call (FR-027) |
 | `NotesDelivered` | Note verdict | per dispatch returning Note (FR-012) |
 | `WakesDispatched` | Wake verdict (whether or not reasoning has yet started) | per dispatch returning Wake (FR-013) |
 | `IgnoredVerdicts` | Ignore verdict | per dispatch returning Ignore (FR-011) |
@@ -64,7 +63,7 @@ This is the v1 surface; soulstream emission of Note records is the soulstream fe
 `WithLogger(slog.Handler)` configures the harness's structured logger. Default is a discard handler (no output).
 
 **Events the harness logs** (level: INFO unless noted):
-- imp start: `name`, `version`, `subject_prefix`, channel count
+- imp start: `name`, `version`, channel count
 - imp ready: after all subscriptions established
 - imp shutdown begin: with drain window
 - imp shutdown end: with timing and pending-reasoning count at deadline (WARN if non-zero)
@@ -74,7 +73,6 @@ This is the v1 surface; soulstream emission of Note records is the soulstream fe
 - awareness panic: channel, entity, recovered stack (ERROR)
 - reasoning panic: entity, reason summary, recovered stack (ERROR)
 - reasoning error: entity, error (WARN)
-- whitelist violation: declared subject, caller (WARN)
 - stream channel: durable bound, ephemeral created, ephemeral deleted (INFO)
 
 The harness does NOT log message bodies.
@@ -100,9 +98,10 @@ A future observability feature can add any of the above without changing the v1 
 ## Probing identity (FR-003)
 
 ```go
-i.Identity()  // returns ImpIdentity{Name, Version, SubjectPrefix}
+i.Identity()  // returns ImpIdentity{Name, Version}
+i.Ready()     // bool: true once startup has registered subscriptions
 ```
 
-Available in `Running`, `Draining`, and `Stopped` states. In the `Failed` state, `Identity` returns the partial values that were resolved before the failure (typically `Name` and `Version` from the spec; `SubjectPrefix` may be empty).
+`Identity()` is available in every lifecycle state; the values are derived from the spec at construction time. `Ready()` flips from `false` to `true` when the lifecycle reaches `Running`.
 
 `Identity()` is NOT registered with NATS in v1 — it is in-process only. Discovery via `$SRV.INFO` belongs to a future capability/discovery feature.

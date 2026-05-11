@@ -63,11 +63,10 @@ func TestSustainedAwarenessUnderLoad(t *testing.T) {
 			}
 			return nil
 		},
-		Actions: []string{"actions.out"},
 	}
 
 	imp, err := harness.NewImp(spec, nc,
-		harness.WithSubjectPrefix("test"),
+
 		harness.WithDrainWindow(2*time.Second),
 	)
 	if err != nil {
@@ -80,7 +79,7 @@ func TestSustainedAwarenessUnderLoad(t *testing.T) {
 
 	for round := 0; round < bursts; round++ {
 		for i := 0; i < entities; i++ {
-			if err := nc.Publish("test.messages.in", []byte(strconv.Itoa(i))); err != nil {
+			if err := nc.Publish("messages.in", []byte(strconv.Itoa(i))); err != nil {
 				t.Fatal(err)
 			}
 		}

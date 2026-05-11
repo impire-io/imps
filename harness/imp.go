@@ -38,11 +38,9 @@ func (i *Imp) runtime() *runtime { return i.rtPtr.Load() }
 // fields are concurrency-safe in their own way (atomics, sync.WaitGroup,
 // or read-only after construction).
 type runtime struct {
-	registry  *registry
-	resolver  *resolver
-	whitelist *whitelist
-	metrics   *metrics
-	logger    logger
+	registry *registry
+	metrics  *metrics
+	logger   logger
 
 	awareness *awarenessCtx
 	reasoning *reasoningCtx
@@ -70,12 +68,12 @@ type runtime struct {
 }
 
 // channelState is the per-channel runtime record. It tracks the source
-// declaration, the resolved subject (post-resolution), and the substrate
-// handle so shutdown can unsubscribe cleanly.
+// declaration, the substrate handle so shutdown can unsubscribe
+// cleanly, and (for stream channels) the consumer name and stream.
 type channelState struct {
-	spec            ChannelSpec
-	resolvedSubject string
-	subscription    *nats.Subscription
+	spec         ChannelSpec
+	subject      string // the literal subject (or filter subject) the channel binds
+	subscription *nats.Subscription
 
 	// Stream-channel fields. Populated only when spec.Source is a
 	// StreamSource.
@@ -127,7 +125,6 @@ func (i *Imp) Run(ctx context.Context) error {
 	rt.logger.info("imp ready",
 		"name", i.spec.Name,
 		"version", i.spec.Version,
-		"subject_prefix", rt.identity.SubjectPrefix,
 	)
 
 	select {
@@ -138,28 +135,18 @@ func (i *Imp) Run(ctx context.Context) error {
 	}
 }
 
-// bootRuntime creates the runtime bag exactly once. Validates option
-// invariants that depend on the prefix / platform-mode combination
-// (FR-033).
+// bootRuntime creates the runtime bag exactly once.
 func (i *Imp) bootRuntime() error {
 	var err error
 	i.rtOnce.Do(func() {
-		res, rerr := newResolver(i.opts.subjectPrefix, i.opts.platformMode, i.opts.importerAccountPK)
-		if rerr != nil {
-			err = rerr
-			return
-		}
 		m := newMetrics()
 		reg := newRegistry(i.spec.States)
-		wl := newWhitelist(i.spec.Actions)
 		lg := newLogger(i.opts.logHandler)
 
 		rCtx, rCancel := context.WithCancel(context.Background())
 
 		rt := &runtime{
 			registry:        reg,
-			resolver:        res,
-			whitelist:       wl,
 			metrics:         m,
 			logger:          lg,
 			reasoningCtx:    rCtx,
@@ -169,17 +156,14 @@ func (i *Imp) bootRuntime() error {
 		}
 		rt.awareness = &awarenessCtx{registry: reg}
 		rt.reasoning = &reasoningCtx{
-			registry:  reg,
-			resolver:  res,
-			whitelist: wl,
-			conn:      i.nc,
-			metrics:   m,
-			logger:    lg,
+			registry: reg,
+			conn:     i.nc,
+			metrics:  m,
+			logger:   lg,
 		}
 		rt.identity = ImpIdentity{
-			Name:          i.spec.Name,
-			Version:       i.spec.Version,
-			SubjectPrefix: res.resolvedPrefix(),
+			Name:    i.spec.Name,
+			Version: i.spec.Version,
 		}
 		i.rtPtr.Store(rt)
 	})
@@ -242,16 +226,24 @@ func (i *Imp) waitDrain() error {
 	}
 }
 
-// Identity returns the running imp's name, version, and resolved subject
-// prefix. Available during Running, Draining, and Stopped states. In the
-// Failed state, returns the partial values that were resolved before the
-// failure (typically Name and Version from the spec; SubjectPrefix may be
-// empty).
+// Identity returns the running imp's name and version. Available in
+// every lifecycle state.
 func (i *Imp) Identity() ImpIdentity {
 	if rt := i.runtime(); rt != nil {
 		return rt.identity
 	}
 	return ImpIdentity{Name: i.spec.Name, Version: i.spec.Version}
+}
+
+// Ready reports whether the imp has finished startup and is dispatching
+// messages. Useful as a readiness signal for tests and for callers that
+// need to wait for subscriptions to register before publishing.
+func (i *Imp) Ready() bool {
+	rt := i.runtime()
+	if rt == nil {
+		return false
+	}
+	return rt.state.Get() == lifecycle.StateRunning
 }
 
 // Metrics returns a non-resetting snapshot of harness counters. Safe to

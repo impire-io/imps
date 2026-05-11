@@ -42,7 +42,6 @@ func memorySpec(cap int, awareness harness.AwarenessFn, onNote func(harness.Enti
 		}},
 		Awareness: awareness,
 		Reasoning: func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil },
-		Actions:   []string{"actions.out"},
 		OnNote:    onNote,
 	}
 }
@@ -55,7 +54,7 @@ func bringUp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harne
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { nc.Close() })
-	defaults := []harness.Option{harness.WithSubjectPrefix("test"), harness.WithDrainWindow(1 * time.Second)}
+	defaults := []harness.Option{harness.WithDrainWindow(1 * time.Second)}
 	imp, err := harness.NewImp(spec, nc, append(defaults, opts...)...)
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +97,7 @@ func TestPerEntityStateConsistency(t *testing.T) {
 	// Drive each entity 3 times.
 	for round := 0; round < 3; round++ {
 		for i := 0; i < N; i++ {
-			if err := nc.Publish("test.messages.in", []byte(strconv.Itoa(i))); err != nil {
+			if err := nc.Publish("messages.in", []byte(strconv.Itoa(i))); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -140,7 +139,7 @@ func TestCapExceededOnNewEntity(t *testing.T) {
 
 	// Drive N+1 distinct entities.
 	for i := 0; i <= N; i++ {
-		if err := nc.Publish("test.messages.in", []byte(strconv.Itoa(i))); err != nil {
+		if err := nc.Publish("messages.in", []byte(strconv.Itoa(i))); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -179,16 +178,16 @@ func TestExistingSlotsAfterCap(t *testing.T) {
 	defer cleanup()
 
 	// Allocate the only slot.
-	if err := nc.Publish("test.messages.in", []byte("only")); err != nil {
+	if err := nc.Publish("messages.in", []byte("only")); err != nil {
 		t.Fatal(err)
 	}
 	// Trigger cap-exceeded.
-	if err := nc.Publish("test.messages.in", []byte("over")); err != nil {
+	if err := nc.Publish("messages.in", []byte("over")); err != nil {
 		t.Fatal(err)
 	}
 	// Existing entity should keep working.
 	for i := 0; i < 3; i++ {
-		if err := nc.Publish("test.messages.in", []byte("only")); err != nil {
+		if err := nc.Publish("messages.in", []byte("only")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -220,7 +219,7 @@ func TestUnknownStateShapeError(t *testing.T) {
 	_, nc, cleanup := bringUp(t, memorySpec(10, awareness, func(_ harness.Entity, p any) { notes <- p }))
 	defer cleanup()
 
-	if err := nc.Publish("test.messages.in", []byte("x")); err != nil {
+	if err := nc.Publish("messages.in", []byte("x")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -272,7 +271,7 @@ func TestConcurrentSameEntitySerialized(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := nc.Publish("test.messages.in", []byte("same")); err != nil {
+			if err := nc.Publish("messages.in", []byte("same")); err != nil {
 				t.Errorf("publish: %v", err)
 			}
 		}()

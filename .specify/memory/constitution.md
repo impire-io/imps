@@ -1,55 +1,60 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 2.0.0
-Bump rationale: MAJOR. The formal Governance section (amendment procedure,
-versioning policy, compliance review expectations) has been replaced by a
-lighter "When This Constitution Changes" section that preserves the spirit
-of explicit, propagating change but removes prescriptive procedural rules.
-This is a backward-incompatible governance change per the prior versioning
-policy and therefore warrants a MAJOR bump. A clarification to the "Sleep
-is the common case" principle (firecracker-specific wording → mechanism-
-agnostic snapshot-based wording, plus an explicit note that the framework
-specifies the contract, not the isolation implementation) is folded into
-this release.
+Version change: 2.1.0 → 2.2.0
+Bump rationale: MINOR. The "Imps see one subject path" Working
+Principle is refined from "uniform `<prefix>.<declared>`" to "the
+framework imposes no transformation; the declared subject is the
+wire subject." The principle's intent is preserved — imps see one
+subject form, cross-account is substrate concern — but the framework
+is removed from the subject-shaping role entirely. Predictability
+gain ("I configured X, the imp publishes on X") motivates the
+refinement. The previous wording is a strict subset of the new
+behavior, but the refinement removes the `WithSubjectPrefix` option
+from the harness, which is a public-API change to already-shipped
+001-harness-core code. Counts as additive guidance plus a coordinated
+1-feature cleanup.
 
 Modified principles:
-  - "Sleep is the common case" — rephrased to be isolation-mechanism-
-    agnostic. Firecracker is no longer named in the constitution; the
-    framework now specifies the sleep contract while leaving the
-    snapshot/isolation implementation as an infrastructure choice.
+  - Working Principles → "Imps see one subject path" — refined as
+    above. The earlier "uniform `<prefix>.<declared>`" wording is
+    replaced; the framework no longer prepends a prefix, no longer
+    encodes a platform-mode segment, no longer transforms subjects
+    in any way.
 
-Added sections:
-  - "When This Constitution Changes" (top-level section, replacing the
-    prior "When this constitution changes" subsection inside Governance).
-
-Removed sections:
-  - "Governance" — the formal section is removed. Its substance about
-    "changes are explicit, propagation is required" is preserved by the
-    new "When This Constitution Changes" section. Prescriptive rules about
-    semantic-versioning bumps and per-PR compliance review are no longer
-    encoded in the constitution itself; the framework relies on the
-    Spec Kit gate commands and the versioning footer below to carry this
-    discipline.
+Added sections: none.
+Removed sections: none.
 
 Templates requiring updates:
-  - ✅ .specify/templates/plan-template.md — Constitution Check gate is
-        intentionally generic; no edit required. Agents executing
-        /speckit-plan MUST continue to read the Load-Bearing Commitments
-        and Non-Negotiables here as the gating rules.
+  - ✅ .specify/templates/plan-template.md — Constitution Check gate
+        is generic; no edit required.
   - ✅ .specify/templates/spec-template.md — No edit required.
   - ✅ .specify/templates/tasks-template.md — No edit required.
-  - ✅ Command files under .specify/templates/commands/*.md — None are
-        agent-specific; no rename pass needed. The /speckit-constitution
-        command's Outline still references a "Governance section"; this
-        is treated as a template hint rather than a hard requirement and
-        is overridden by the explicit content the project has chosen.
-  - ⚠ README.md / docs/quickstart.md — not yet present in the repository;
-        when added, must reference the load-bearing commitments and the
-        non-negotiables explicitly.
+  - ✅ Command files under .specify/templates/commands/*.md — No edit
+        required.
 
-Follow-up TODOs: none. RATIFICATION_DATE preserved (2026-05-10).
-LAST_AMENDED_DATE updated to 2026-05-10.
+Follow-up TODOs (rolled forward from v2.1.0 plus new):
+  - The 001-harness-core feature shipped `harness.WithSubjectPrefix`,
+    `ImpIdentity.SubjectPrefix`, and an internal `resolver`. All are
+    removed in the coordinated cleanup that lands with this
+    amendment. The cleanup also removes the `Actions` whitelist
+    (`ImpSpec.Actions`, `*ErrWhitelistViolation`,
+    `Metrics.WhitelistViolations`) — subject permissioning is a
+    substrate concern (NATS ACLs), not a framework one. And it adds
+    `ReasoningContext.Conn() *nats.Conn` as the escape hatch for
+    generic NATS-based clients.
+  - `docs/02-capability-service-pattern.md` describes per-deployment
+    subject prefix conventions for services. With the framework no
+    longer adding a prefix on the imp side, the doc's prefix-
+    convention section needs revisiting — services still choose
+    their subject taxonomy, but the framework imposes no further
+    rewriting on the imp side.
+  - `docs/01-harness-anatomy.md` describes the action whitelist
+    ("attempts to publish elsewhere are rejected at the harness").
+    Update to describe NATS ACLs as the substrate-side mechanism.
+
+RATIFICATION_DATE preserved (2026-05-10).
+LAST_AMENDED_DATE updated to 2026-05-11.
 -->
 
 # Imp Framework Constitution
@@ -135,6 +140,14 @@ This is what keeps imps small while letting the colony accumulate knowledge. Eve
 Imps verify their dependencies at startup via `$SRV.INFO` and address capabilities by subject thereafter. No per-request discovery. No client-side service selection.
 
 This trades adaptability for simplicity, deliberately. Imps that need adaptation can opt in; the default path is fast and direct.
+
+### Imps see one subject path
+
+The subjects an imp declares in its spec are the subjects the substrate sees on the wire — verbatim. The harness performs no prefix-insertion, no platform-mode segment, no subject rewriting of any kind. If a channel declares `messages.in`, the harness subscribes to `messages.in`. If reasoning publishes `actions.out`, the substrate sees `actions.out`.
+
+Whether a responder lives in the same NATS account or a different one is invisible to the imp; cross-account routing is handled by NATS account imports, which can rewrite exported subjects so the imp's declared subject reaches the right responder. Multi-tenant scoping, environment prefixing, and similar topology decisions are configured at the substrate (operator concern), not encoded in framework code or imp source.
+
+This keeps the imp's source single-form and the framework's substrate behavior trivial to predict: what you declare is what you get on the wire.
 
 ### Sleep is the common case
 
@@ -281,4 +294,4 @@ When proposing a change, surface what's changing, why, and what dependent docs n
 
 *The framework is built by many hands. This constitution is what keeps the result coherent across them. Read it, internalize it, and when in doubt, return to it.*
 
-**Version**: 2.0.0 | **Ratified**: 2026-05-10 | **Last Amended**: 2026-05-10
+**Version**: 2.2.0 | **Ratified**: 2026-05-10 | **Last Amended**: 2026-05-11

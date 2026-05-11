@@ -173,11 +173,3 @@ func TestValidateSpec_NilDecodeOrExtractor(t *testing.T) {
 		t.Fatalf("expected ErrSpecInvalid{Field:ChannelSpec.ExtractEntity}, got %v", err)
 	}
 }
-
-func TestValidateSpec_DuplicateActionsAccepted(t *testing.T) {
-	s := minimalSpec()
-	s.Actions = []string{"a", "a", "b"}
-	if err := validateSpec(s); err != nil {
-		t.Fatalf("expected nil for duplicate actions, got %v", err)
-	}
-}

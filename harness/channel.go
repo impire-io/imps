@@ -15,8 +15,9 @@ type Source interface {
 }
 
 // SubjectSource declares a core-NATS subject channel. Subject is the
-// pre-resolution form; the harness applies the configured subject prefix
-// and (in platform mode) the importer account public key segment.
+// literal subject the harness subscribes to — the framework performs no
+// transformation. Wildcards (* and >) are passed through verbatim to the
+// substrate.
 type SubjectSource struct {
 	Subject string
 }
@@ -65,8 +66,8 @@ type Decoder func(msg Message) (any, error)
 type EntityExtractor func(decoded any) (Entity, error)
 
 // Message is the harness's view of an inbound substrate message. Subject
-// is the resolved subject the message arrived on. Ack/NAK is owned by the
-// harness so user code cannot short-circuit ack timing.
+// is the subject the message arrived on. Ack/NAK is owned by the harness
+// so user code cannot short-circuit ack timing.
 type Message struct {
 	Subject string
 	Reply   string

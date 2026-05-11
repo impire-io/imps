@@ -30,7 +30,6 @@ func concurrencySpec(reasoning harness.ReasoningFn) harness.ImpSpec {
 			return harness.Wake(decoded, e)
 		},
 		Reasoning: reasoning,
-		Actions:   []string{"actions.out"},
 	}
 }
 
@@ -42,7 +41,7 @@ func freshImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harn
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { nc.Close() })
-	defaults := []harness.Option{harness.WithSubjectPrefix("test"), harness.WithDrainWindow(2 * time.Second)}
+	defaults := []harness.Option{harness.WithDrainWindow(2 * time.Second)}
 	imp, err := harness.NewImp(spec, nc, append(defaults, opts...)...)
 	if err != nil {
 		t.Fatal(err)
@@ -79,10 +78,10 @@ func TestConcurrentReasoningDistinctEntities(t *testing.T) {
 	imp, nc, cleanup := freshImp(t, concurrencySpec(reasoning))
 	defer cleanup()
 
-	if err := nc.Publish("test.messages.in", []byte("E1")); err != nil {
+	if err := nc.Publish("messages.in", []byte("E1")); err != nil {
 		t.Fatal(err)
 	}
-	if err := nc.Publish("test.messages.in", []byte("E2")); err != nil {
+	if err := nc.Publish("messages.in", []byte("E2")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -123,7 +122,7 @@ func TestAwarenessNotBlockedByHeldReasoning(t *testing.T) {
 	defer cleanup()
 
 	// First message: trips reasoning that will block.
-	if err := nc.Publish("test.messages.in", []byte("blocker")); err != nil {
+	if err := nc.Publish("messages.in", []byte("blocker")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -140,7 +139,7 @@ func TestAwarenessNotBlockedByHeldReasoning(t *testing.T) {
 	// awareness runs. A held reasoning must NOT block this.
 	awarenessLatency.Store(0)
 	publishTime := time.Now()
-	if err := nc.Publish("test.messages.in", []byte("after")); err != nil {
+	if err := nc.Publish("messages.in", []byte("after")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -177,7 +176,7 @@ func TestShutdownDrainWindow(t *testing.T) {
 	}
 
 	spec := concurrencySpec(reasoning)
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"), harness.WithDrainWindow(drain))
+	imp, err := harness.NewImp(spec, nc, harness.WithDrainWindow(drain))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,10 +188,10 @@ func TestShutdownDrainWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := nc.Publish("test.messages.in", []byte("E1")); err != nil {
+	if err := nc.Publish("messages.in", []byte("E1")); err != nil {
 		t.Fatal(err)
 	}
-	if err := nc.Publish("test.messages.in", []byte("E2")); err != nil {
+	if err := nc.Publish("messages.in", []byte("E2")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -229,7 +228,7 @@ func TestReasoningPanicIsolation(t *testing.T) {
 	t.Cleanup(func() { nc.Close() })
 
 	publishedAction := make(chan []byte, 4)
-	if _, err := nc.Subscribe("test.actions.out", func(m *nats.Msg) { publishedAction <- m.Data }); err != nil {
+	if _, err := nc.Subscribe("actions.out", func(m *nats.Msg) { publishedAction <- m.Data }); err != nil {
 		t.Fatal(err)
 	}
 
@@ -243,7 +242,7 @@ func TestReasoningPanicIsolation(t *testing.T) {
 	}
 
 	spec := concurrencySpec(reasoning)
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"), harness.WithDrainWindow(2*time.Second))
+	imp, err := harness.NewImp(spec, nc, harness.WithDrainWindow(2*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,13 +255,13 @@ func TestReasoningPanicIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := nc.Publish("test.messages.in", []byte("panic")); err != nil {
+	if err := nc.Publish("messages.in", []byte("panic")); err != nil {
 		t.Fatal(err)
 	}
-	if err := nc.Publish("test.messages.in", []byte("ok-1")); err != nil {
+	if err := nc.Publish("messages.in", []byte("ok-1")); err != nil {
 		t.Fatal(err)
 	}
-	if err := nc.Publish("test.messages.in", []byte("ok-2")); err != nil {
+	if err := nc.Publish("messages.in", []byte("ok-2")); err != nil {
 		t.Fatal(err)
 	}
 

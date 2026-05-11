@@ -55,17 +55,16 @@ A developer's awareness function inspects an incoming message and returns one of
 
 ### User Story 3 - The awareness/reasoning boundary is structural (Priority: P1)
 
-The awareness context type exposes only what awareness is allowed to do — local state access and the verdict return. The reasoning context type exposes local state access and action publishing on declared subjects. The compiler refuses code that calls a publish from awareness because the method does not exist on the awareness context. At runtime, an action publish to a subject that is not in the imp's declared whitelist is rejected before reaching the messaging substrate, with a clear error naming the offending subject.
+The awareness context type exposes only what awareness is allowed to do — local state access and the verdict return. The reasoning context type exposes additional capabilities, including action publishing. The compiler refuses code that calls a publish from awareness because the method does not exist on the awareness context. The framework imposes no runtime subject whitelist; subject permissioning is the substrate's concern (NATS account ACLs on the connection).
 
-**Why this priority**: This is the constitutional guarantee. The harness does not enforce the boundary by convention or runtime check alone — it enforces it by typed surface. A developer who tries to publish from awareness writes code that does not compile; a developer who tries to publish off-whitelist gets a clear rejection at the call site.
+**Why this priority**: This is the constitutional guarantee. The harness enforces the boundary by typed surface, not by convention or runtime check. A developer who tries to publish from awareness writes code that does not compile.
 
-**Independent Test**: Attempt to call action-publish from inside the awareness context — verify the type system prevents it (a build-time check or compilation test). At runtime, call reasoning-context publish with a subject not in the spec's whitelist; assert the publish returns a typed whitelist-violation error, the violation does not appear on the messaging substrate, and the imp continues running.
+**Independent Test**: Attempt to call action-publish from inside the awareness context — verify the type system prevents it (a build-tagged compilation test that must fail to build).
 
 **Acceptance Scenarios**:
 
 1. **Given** the awareness context type, **When** code attempts to invoke action-publish from awareness, **Then** the code fails to compile (the publish method is not present on the awareness context).
-2. **Given** an imp whose action whitelist is `{A1, A2}`, **When** reasoning calls publish on subject `A3`, **Then** the call returns a whitelist-violation error naming `A3`, no message reaches NATS, and the reasoning function continues to control flow.
-3. **Given** an imp whose action whitelist is `{A1, A2}`, **When** reasoning calls publish on subject `A1`, **Then** the message is published on `A1` and the publish call returns success.
+2. **Given** reasoning calls publish on any subject the substrate permits, **When** the call is made, **Then** the message is published verbatim on that subject and the publish call returns the substrate's outcome.
 
 ---
 
@@ -120,19 +119,18 @@ Two distinct entities receiving messages in close succession produce two reasoni
 
 ---
 
-### User Story 7 - Same code, both deployment modes (Priority: P2)
+### User Story 7 - Subject resolution honors the configured prefix (Priority: P2)
 
-The same imp definition runs in non-platform mode (subjects prefixed with a configured prefix; the imp lives in the same account as its consumers and producers) and in platform mode (subjects include the importing account's public key as a path segment; the imp lives in a platform account whose endpoints are exported to importer accounts). Endpoints, dispatch behavior, contracts, and developer-facing API are identical across modes — only the resolved subject path and per-request account attribution differ.
+The imp's source declares channel and action subjects in pre-resolution form (e.g., `messages.in`, `actions.out`); at runtime the harness applies the configured subject prefix to produce the substrate subject (`<prefix>.messages.in`, `<prefix>.actions.out`). The imp's view of NATS subjects is single-form per the constitution's "Imps see one subject path" principle; cross-account access — when a responder lives in a different NATS account — is handled by NATS account imports that rewrite exported subjects onto the imp's non-platform form, not by framework code.
 
-**Why this priority**: The framework's commitment is one codebase, two deployment shapes. If a developer has to write or test mode-specific code, the abstraction has failed.
+**Why this priority**: The framework's commitment is one codebase, one subject shape. A developer should never write mode-specific code; the substrate (account configuration) absorbs cross-account topology.
 
-**Independent Test**: Run the same imp definition twice against an embedded NATS server: once with `platform_mode = false` and a configured prefix, once with `platform_mode = true` and a configured importer account public key. Publish a message on the resolved subject for each mode; assert the action is published on the correctly-resolved action subject for each mode. The imp's source code is identical between runs.
+**Independent Test**: Run an imp against an embedded NATS server with `WithSubjectPrefix("tenantA.imps.demo")`. Publish on `tenantA.imps.demo.messages.in`; assert reasoning publishes the action on `tenantA.imps.demo.actions.out`. The imp's source contains only pre-resolution subjects.
 
 **Acceptance Scenarios**:
 
-1. **Given** the imp's spec declares channel subject `messages.in` and action subject `actions.out` and `platform_mode = false` with prefix `tenantA.imps.demo`, **When** the harness starts, **Then** the channel subscribes to `tenantA.imps.demo.messages.in` and reasoning publishes to `tenantA.imps.demo.actions.out`.
-2. **Given** the same imp spec with `platform_mode = true` and importer account public key `ACCOUNT_PK`, **When** the harness starts, **Then** the channel subscribes and the action publishes to subjects that include `ACCOUNT_PK` as a path segment in the documented position, and the developer-facing channel and action declarations are unchanged from non-platform mode.
-3. **Given** the harness is configured with `platform_mode = true` but no importer account public key is supplied, **When** the harness starts, **Then** startup fails with a clear configuration error naming the missing field; no subscriptions are established.
+1. **Given** the imp's spec declares channel subject `messages.in` and action subject `actions.out` with prefix `tenantA.imps.demo`, **When** the harness starts, **Then** the channel subscribes to `tenantA.imps.demo.messages.in` and reasoning publishes to `tenantA.imps.demo.actions.out`.
+2. **Given** the harness is constructed without a subject prefix, **When** the harness starts, **Then** startup fails with a clear configuration error naming the missing prefix; no subscriptions are established.
 
 ---
 
@@ -162,13 +160,12 @@ The harness starts by establishing every declared subscription and registering t
 - **Awareness or reasoning attempts to write to a state shape that was not declared in the spec** — the call returns a typed "unknown state shape" error.
 - **Two awareness calls for the same entity arrive concurrently from two channels** — both observe a consistent snapshot of state for that entity (read-modify-write on the same entity is serialized within a state shape; cross-shape ordering is not guaranteed).
 - **Channel pattern matches but the imp's connection lacks subject permission** — the subscription either is rejected at startup (preferred) or surfaces a runtime publish/subscribe authorization error captured by the harness.
-- **`platform_mode = true` but no importer account public key configured** — startup fails with a clear configuration error (acceptance scenario 7.3).
 - **Stream channel: stream does not exist at startup** — startup fails with a clear error naming the missing stream; no subscriptions are established (acceptance scenario 4.3).
 - **Stream channel: durable consumer exists but its server-side config is incompatible with the channel's declared config** — startup fails with a clear error naming the incompatibility (acceptance scenario 4.4).
 - **Stream channel: ack failure on the substrate** (e.g., transient JetStream error during ack) — the harness records the failure and continues; the substrate's redelivery semantics govern whether the message is redelivered.
 - **Stream channel: max-deliveries exceeded on the consumer** — substrate-handled (the consumer's max-deliveries config governs); the harness exposes the message-stuck signal through its observability surface but does not introduce its own retry or dead-letter logic.
 - **Multiple state shapes share the same name in the spec** — startup fails with a clear duplicate-shape error.
-- **The same action subject appears on the whitelist more than once** — duplicates are accepted and de-duplicated; whitelist semantics are set membership.
+- **Imp publishes on a subject the substrate (NATS account ACLs) forbids** — the substrate rejects the publish; the framework returns the substrate's error verbatim. No framework-side whitelist.
 
 ## Requirements *(mandatory)*
 
@@ -176,9 +173,9 @@ The harness starts by establishing every declared subscription and registering t
 
 #### Imp specification
 
-- **FR-001**: Developers MUST be able to construct an imp by declaring: a name, a version, zero or more channels, an awareness function, a reasoning function, zero or more local-memory state shapes (each with a name, a per-entity factory/zero-value, and a per-entity-count cap), and an action subject whitelist.
+- **FR-001**: Developers MUST be able to construct an imp by declaring: a name, a version, zero or more channels, an awareness function, a reasoning function, and zero or more local-memory state shapes (each with a name, a per-entity factory/zero-value, and a per-entity-count cap). Subject permissioning for outbound publishes is the substrate's concern (NATS account ACLs); the framework does not declare an outbound subject whitelist.
 - **FR-002**: The harness MUST reject construction at the call site if the spec is incomplete (missing name, missing awareness function, missing reasoning function), if state shapes have duplicate names, or if any state shape's per-entity cap is non-positive. The error MUST name the offending field.
-- **FR-003**: An imp's identity (name, version, resolved subject prefix) MUST be queryable from the running harness.
+- **FR-003**: An imp's identity (name and version) MUST be queryable from the running harness. The harness MUST expose a Ready() signal indicating that startup has completed and dispatch is active.
 
 #### Channels
 
@@ -223,18 +220,18 @@ The harness starts by establishing every declared subscription and registering t
 - **FR-025**: Reads and writes against existing slots MUST continue to succeed after the cap has been reached.
 - **FR-026**: References to a state shape that was not declared in the spec MUST return a typed unknown-shape error.
 
-#### Actions and the whitelist
+#### Actions
 
-- **FR-027**: The reasoning context's publish call MUST check the requested subject against the spec's whitelist before publishing. If the subject is not on the whitelist, the call MUST return a typed whitelist-violation error naming the offending subject and the message MUST NOT reach NATS.
-- **FR-028**: When the requested subject is on the whitelist, the harness MUST publish the message on the resolved subject for the active deployment mode (see FR-030/FR-031).
-- **FR-029**: Awareness MUST have no action-publish surface; this is enforced by the awareness context type (FR-014).
+- **FR-027**: The reasoning context MUST expose a publish call that publishes the message on the substrate verbatim. Subject permissioning is the substrate's concern (NATS account ACLs); the framework performs no whitelist check. A publish refused by the substrate MUST surface the substrate's error to the caller.
+- **FR-028**: Awareness MUST have no action-publish surface; this is enforced by the awareness context type (FR-014).
+- **FR-029**: The reasoning context MUST expose `Conn() *nats.Conn` returning the connection passed at NewImp time. This is the escape hatch for generic NATS-based clients used from reasoning. Awareness MUST NOT have an equivalent method — the absence is the structural enforcement of the energy gradient.
 
-#### Deployment modes
+#### Subjects
 
-- **FR-030**: When the harness is configured with `platform_mode = false` and a subject prefix `P`, channel and action subjects MUST be resolved as `P.<declared-subject>`.
-- **FR-031**: When the harness is configured with `platform_mode = true` and an importer account public key `K`, channel and action subjects MUST be resolved with `K` included as a path segment in the position defined by the platform-mode subject convention; the resolved-subject convention MUST be identical for channels and actions within a single run.
-- **FR-032**: The imp's developer-facing API (channel and action declarations, awareness/reasoning signatures, context surfaces) MUST be identical across modes. Switching modes MUST NOT require source changes to the imp.
-- **FR-033**: When `platform_mode = true` and no importer account public key is supplied, startup MUST fail with a clear configuration error.
+- **FR-030**: The framework MUST NOT transform subjects. A declared channel subject is the substrate subject verbatim; a publish on subject `S` from reasoning publishes on `S`. Per the constitution's "Imps see one subject path" principle, cross-account routing and tenant scoping are configured at the substrate (NATS account imports), not encoded in framework code or imp source.
+- **FR-031**: (Reserved — formerly the channel/action symmetry guarantee; trivially satisfied now that the framework imposes no transformation.)
+- **FR-032**: The imp's developer-facing API (channel and action declarations, awareness/reasoning signatures, context surfaces) MUST be independent of substrate topology. Account-level scoping, prefixing, and routing MUST be configured outside the framework.
+- **FR-033**: (Reserved — formerly the missing-prefix configuration error; no prefix to validate now.)
 
 #### Lifecycle
 
@@ -251,15 +248,14 @@ The harness starts by establishing every declared subscription and registering t
 
 ### Key Entities
 
-- **Imp Spec** — The declarative description of an imp: name, version, channels, awareness function, reasoning function, local-memory state shapes, action subject whitelist. Provided to the harness at construction.
+- **Imp Spec** — The declarative description of an imp: name, version, channels, awareness function, reasoning function, local-memory state shapes. Provided to the harness at construction. (Subject permissioning is a substrate concern; the spec carries no outbound subject whitelist.)
 - **Channel** — An inbound message-source declaration. Each channel has a *source kind* (`subject` or `stream`), a kind-appropriate descriptor, a decode step, and an entity extractor. Subject channels are core NATS subscriptions on a subject (or pattern). Stream channels are JetStream consumers (durable or ephemeral) bound to a stream and filter subject. KV channels are deferred to a follow-up feature.
 - **Awareness Context** — A typed surface available to the awareness function. Exposes per-entity local-state access and the verdict return path. Does not expose action publishing or any unbounded operations.
 - **Awareness Verdict** — One of `Ignore`, `Note(payload)`, `Wake(reason, entity)`. The contract between awareness and the harness.
-- **Reasoning Context** — A typed surface available to the reasoning function. Exposes per-entity local-state access and action publishing on the declared whitelist.
+- **Reasoning Context** — A typed surface available to the reasoning function. Exposes per-entity local-state access, action publishing, the in-flight reasoning count, and the raw NATS connection (the escape hatch for generic NATS-based clients).
 - **Wake Reason** — A user-defined value carried from awareness's `Wake` verdict to the reasoning function. Opaque to the harness.
 - **Local State Shape** — A named, capped, factory-backed per-entity state declaration. Indexed at runtime by `(state name, entity)`.
-- **Action Whitelist** — The set of NATS subjects (declared in the spec) on which reasoning may publish. Subjects not in the set are rejected by the harness before reaching NATS.
-- **Imp Identity** — The triple (name, version, resolved subject prefix) that identifies a running imp instance.
+- **Imp Identity** — The pair (name, version) that identifies a running imp instance.
 - **Note Record** — A locally observable record produced by the `Note` verdict, carrying a user-defined payload.
 
 ## Success Criteria *(mandatory)*
@@ -270,10 +266,10 @@ The harness starts by establishing every declared subscription and registering t
 - **SC-002**: An end-to-end test (publisher publishes on a channel subject; assertion subscribes on the action subject) completes within a small bounded time on a local embedded messaging server (target: under 1 second per round-trip in a clean environment).
 - **SC-003**: With reasoning held under a deliberate block for one entity, awareness for new messages on the same imp continues to be dispatched within a small bounded delay (target: under 50 ms additional latency vs. the unblocked baseline).
 - **SC-004**: With reasoning invocations running concurrently for `K` distinct entities (target `K ≥ 100`), no entity's reasoning is delayed by another's progress in a way attributable to the harness.
-- **SC-005**: An attempt to publish to a non-whitelisted subject is rejected at the publish call site with a typed error that names the offending subject; no message reaches the messaging substrate.
-- **SC-006**: A compile-time check confirms the awareness context type does not expose an action-publish method.
+- **SC-005**: (Reserved — formerly the whitelist-rejection criterion. Subject permissioning is now substrate-side, not framework-side.)
+- **SC-006**: A compile-time check confirms the awareness context type does not expose an action-publish method (and does not expose a `Conn()` accessor or any other outbound surface beyond what awareness is allowed).
 - **SC-007**: An attempt to allocate a `(state-shape, entity)` slot beyond the declared cap returns a typed cap-exceeded error naming the state shape and the current count; no existing entity slot is evicted.
-- **SC-008**: The same imp source builds and runs against both deployment modes (non-platform and platform) with no developer code changes; the only configuration delta is `platform_mode` and the mode-specific subject parameters.
+- **SC-008**: The framework imposes no subject transformation. A declared subject `S` appears on the wire as `S`; substrate-level routing (account imports, etc.) is configured outside the framework.
 - **SC-009**: Shutdown returns within `drain_window + small ε` regardless of in-flight reasoning, and leaves no subscriptions or dispatch goroutines.
 - **SC-010**: The harness's per-message dispatch overhead (excluding user-supplied awareness/decode/extractor work) is bounded and independent of the number of in-flight reasoning invocations and the number of tracked entities (target: dispatch overhead growth less than linear in either dimension under typical workloads).
 - **SC-011**: A single imp instance sustains continuous awareness dispatch on a channel while reasoning invocations remain in flight for thousands of entities, without observable awareness backpressure.

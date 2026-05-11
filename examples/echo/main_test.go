@@ -1,6 +1,5 @@
 // Echo example end-to-end smoke test that mirrors the integration-test
-// pattern from quickstart.md. Builds the same imp source as main.go and
-// verifies the round-trip over an embedded NATS server.
+// pattern from quickstart.md.
 package main
 
 import (
@@ -39,10 +38,9 @@ func TestEchoEndToEnd(t *testing.T) {
 		Reasoning: func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
 			return r.Publish(ctx, "actions.out", []byte(reason.(string)))
 		},
-		Actions: []string{"actions.out"},
 	}
 
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+	imp, err := harness.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,19 +49,19 @@ func TestEchoEndToEnd(t *testing.T) {
 	go func() { _ = imp.Run(ctx) }()
 
 	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && imp.Identity().SubjectPrefix == "" {
+	for time.Now().Before(deadline) && !imp.Ready() {
 		time.Sleep(10 * time.Millisecond)
 	}
 
 	got := make(chan []byte, 1)
-	if _, err := nc.Subscribe("test.actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
+	if _, err := nc.Subscribe("actions.out", func(m *nats.Msg) { got <- m.Data }); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := nc.Publish("test.messages.in", []byte("hello")); err != nil {
+	if err := nc.Publish("messages.in", []byte("hello")); err != nil {
 		t.Fatal(err)
 	}
 

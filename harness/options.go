@@ -10,11 +10,8 @@ import (
 // populated from the variadic Option list passed to NewImp; defaults are
 // applied before any Option runs.
 type runtimeOptions struct {
-	drainWindow       time.Duration
-	logHandler        slog.Handler
-	subjectPrefix     string
-	platformMode      bool
-	importerAccountPK string
+	drainWindow time.Duration
+	logHandler  slog.Handler
 }
 
 func defaultRuntimeOptions() runtimeOptions {
@@ -43,24 +40,5 @@ func WithLogger(h slog.Handler) Option {
 		if h != nil {
 			o.logHandler = h
 		}
-	}
-}
-
-// WithSubjectPrefix sets the subject prefix used for channel subscription
-// and action-publish resolution. Required in non-platform mode; also used
-// as the leading segment in platform mode.
-func WithSubjectPrefix(prefix string) Option {
-	return func(o *runtimeOptions) {
-		o.subjectPrefix = prefix
-	}
-}
-
-// WithPlatformMode switches the resolver to platform mode and sets the
-// importer account public key segment. The resolved subject becomes
-// "<prefix>.<importerAccountPK>.<declared>".
-func WithPlatformMode(importerAccountPK string) Option {
-	return func(o *runtimeOptions) {
-		o.platformMode = true
-		o.importerAccountPK = importerAccountPK
 	}
 }

@@ -22,7 +22,6 @@ func lifecycleSpec(channels []harness.ChannelSpec, reasoning harness.ReasoningFn
 			return harness.Wake(decoded, e)
 		},
 		Reasoning: reasoning,
-		Actions:   []string{"actions.out"},
 	}
 }
 
@@ -48,7 +47,7 @@ func TestStartupRegistersSubscriptions(t *testing.T) {
 	}
 	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil })
 
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+	imp, err := harness.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +58,7 @@ func TestStartupRegistersSubscriptions(t *testing.T) {
 
 	// Identity matches.
 	id := imp.Identity()
-	if id.Name != "lifecycle" || id.Version != "1.2.3" || id.SubjectPrefix != "test" {
+	if id.Name != "lifecycle" || id.Version != "1.2.3" {
 		t.Fatalf("unexpected identity: %+v", id)
 	}
 
@@ -67,13 +66,13 @@ func TestStartupRegistersSubscriptions(t *testing.T) {
 	got := make(chan string, 4)
 	for _, ch := range channels {
 		ch := ch
-		if _, err := nc.Subscribe("test."+ch.Source.(harness.SubjectSource).Subject, func(*nats.Msg) {}); err != nil {
+		if _, err := nc.Subscribe(ch.Source.(harness.SubjectSource).Subject, func(*nats.Msg) {}); err != nil {
 			t.Fatal(err)
 		}
-		// publish through the imp's resolved subject — if its subscription
-		// is up, dispatch will run; we only care that a publish doesn't
-		// silently disappear.
-		_ = nc.Publish("test."+ch.Source.(harness.SubjectSource).Subject, []byte(ch.Name))
+		// publish on the literal subject — if the imp's subscription is up,
+		// dispatch will run; we only care that a publish doesn't silently
+		// disappear.
+		_ = nc.Publish(ch.Source.(harness.SubjectSource).Subject, []byte(ch.Name))
 		got <- ch.Name
 	}
 	if err := nc.Flush(); err != nil {
@@ -105,7 +104,7 @@ func TestStartupFailureNoLeaks(t *testing.T) {
 	}
 	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil })
 
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+	imp, err := harness.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +159,7 @@ func TestShutdownDrainBoundedReturn(t *testing.T) {
 	}
 
 	spec := lifecycleSpec([]harness.ChannelSpec{subjectChannel("inbound", "messages.in")}, reasoning)
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"), harness.WithDrainWindow(drain))
+	imp, err := harness.NewImp(spec, nc, harness.WithDrainWindow(drain))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,10 +168,10 @@ func TestShutdownDrainBoundedReturn(t *testing.T) {
 	go func() { runErr <- imp.Run(ctx) }()
 	waitReady(t, imp)
 
-	if err := nc.Publish("test.messages.in", []byte("E1")); err != nil {
+	if err := nc.Publish("messages.in", []byte("E1")); err != nil {
 		t.Fatal(err)
 	}
-	if err := nc.Publish("test.messages.in", []byte("E2")); err != nil {
+	if err := nc.Publish("messages.in", []byte("E2")); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
@@ -209,14 +208,14 @@ func TestIdentityAcrossStates(t *testing.T) {
 	spec := lifecycleSpec([]harness.ChannelSpec{subjectChannel("inbound", "messages.in")},
 		func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil })
 
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+	imp, err := harness.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Before Run: Identity returns spec values, prefix empty.
+	// Before Run: Identity returns spec values.
 	id := imp.Identity()
-	if id.Name != "lifecycle" || id.Version != "1.2.3" || id.SubjectPrefix != "" {
+	if id.Name != "lifecycle" || id.Version != "1.2.3" {
 		t.Fatalf("pre-run identity: %+v", id)
 	}
 
@@ -225,9 +224,9 @@ func TestIdentityAcrossStates(t *testing.T) {
 	go func() { runErr <- imp.Run(ctx) }()
 	waitReady(t, imp)
 
-	// Running: full identity.
+	// Running: identity unchanged.
 	id = imp.Identity()
-	if id.SubjectPrefix != "test" {
+	if id.Name != "lifecycle" || id.Version != "1.2.3" {
 		t.Fatalf("running identity: %+v", id)
 	}
 
@@ -236,7 +235,7 @@ func TestIdentityAcrossStates(t *testing.T) {
 
 	// Stopped: identity still available.
 	id = imp.Identity()
-	if id.Name != "lifecycle" || id.SubjectPrefix != "test" {
+	if id.Name != "lifecycle" || id.Version != "1.2.3" {
 		t.Fatalf("stopped identity: %+v", id)
 	}
 }

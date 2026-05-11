@@ -149,29 +149,32 @@ type ReasoningContext interface {
 
 ---
 
-## R-11: Subject resolution for both deployment modes
+## R-11: No subject transformation
 
-**Decision**: A single `subjects.Resolver` constructed at harness startup from `(platform_mode bool, prefix string, importer_account_pk string)`. It exposes `Resolve(declared string) string`. Both channel subscriptions and action publishes go through the same resolver — same code, both modes (FR-032, SC-008).
+**Decision**: The framework performs no subject transformation. Channel subscriptions bind on the declared subject verbatim; `Publish` publishes on the declared subject verbatim. No `WithSubjectPrefix` option, no resolver, no `<prefix>.<declared>` mapping. Cross-account routing and tenant scoping are configured at the substrate via NATS account imports.
 
-For non-platform mode, `Resolve(s)` returns `<prefix>.<s>` (FR-030). For platform mode, `Resolve(s)` returns `<prefix>.<importer_account_pk>.<s>` per the capability-service-pattern subject convention (FR-031). Startup fails with a clear error when `platform_mode = true` and the importer account public key is missing (FR-033).
+**Rationale**: Per the constitution's "Imps see one subject path" principle (v2.2.0), the subjects an imp declares are the substrate subjects on the wire. The earlier `<prefix>.<declared>` rule produced unpredictable behavior — "I configured X but the imp publishes on `whatever.X`" — and was redundant with NATS account-level scoping that an operator already has to configure for multi-tenant deployments. Removing the framework-side prefix collapses the matrix.
 
-**Rationale**: Concentrating mode-specific logic in one type means the dispatch path, the publish path, and the stream-channel filter resolution all branch the same way. SC-008 — same imp source under both modes — falls out naturally.
+**Historical note**: Earlier drafts of this feature carried (a) a `platform_mode` flag + `importer_account_pk` segment, then (b) a single-form `<prefix>.<declared>` resolver after constitution v2.1.0. Constitution v2.2.0 retired the prefix entirely; the `WithSubjectPrefix` option, the internal `resolver`, and `ImpIdentity.SubjectPrefix` were all removed in the same cleanup.
 
 **Alternatives considered**:
-- Mode-specific code paths in `dispatch/` and `stream/` — rejected; multiplies the surface where mode handling could drift.
-- Configuring two prefixes (one for channels, one for actions) — rejected; the spec explicitly says channels and actions use the same convention within a single run (FR-031).
+- Mode-specific code paths in `dispatch/` and `stream/` — rejected then and now.
+- Configuring two prefixes (one for channels, one for actions) — rejected; channels and actions used the same convention while the resolver existed, and now both pass through verbatim.
+- Letting the framework keep an optional prefix that defaults to empty — rejected; a per-deployment knob the imp's source doesn't see produces exactly the "I configured X" surprise the v2.2.0 amendment was motivated by.
 
 ---
 
-## R-12: Action whitelist enforcement point
+## R-12: Subject permissioning is the substrate's concern
 
-**Decision**: The reasoning context's `Publish` checks the requested subject against an unordered set built from the spec's whitelist at imp construction. A non-member returns `ErrWhitelistViolation{Subject: s}` *before* any NATS publish call (FR-027, SC-005). Subject resolution (mode-specific) happens after the whitelist check, on the declared-subject form, so the whitelist is on declared subjects (matching the user's spec).
+**Decision**: No framework-side action whitelist. `Publish` is a thin shim over `nc.Publish` — no pre-check, no `ErrWhitelistViolation`, no `Actions` field on `ImpSpec`. Subject permissioning is configured at NATS at the account / connection level (account ACLs).
 
-**Rationale**: A pre-publish check is the only way to satisfy "the message MUST NOT reach NATS" (FR-027). Storing the whitelist as a `map[string]struct{}` makes the check O(1).
+**Rationale**: The earlier `Actions` whitelist was defense-in-depth — a runtime check the framework did because it didn't trust the imp's code to behave. But the framework runs the imp's code; if the imp can't be trusted, a framework-side check doesn't help (the imp could call `nc.Publish` directly, or — with `ReasoningContext.Conn()` added in the same cleanup — could pull the raw connection out anyway). NATS ACLs are an out-of-process check that actually constrains a compromised process. Defense-in-depth that doesn't depend on the controlled component being trustworthy is the right shape.
+
+**Historical note**: Earlier drafts had `ImpSpec.Actions []string`, a runtime whitelist check in `Publish`, an `ErrWhitelistViolation` typed error, and a `WhitelistViolations` metric. All retired in the constitution-v2.2.0 cleanup.
 
 **Alternatives considered**:
-- Subject-permission enforcement at the NATS server — works as defense-in-depth but does not satisfy the typed-error requirement at the call site.
-- Wildcard whitelist support (e.g., `actions.>`) — out of scope for v1; spec FR-001 declares the whitelist as concrete subjects. Adding wildcard membership is a follow-up.
+- Keeping the whitelist as documentation only (no enforcement) — rejected; documentation that doesn't fail at use-site rots.
+- Whitelist + NATS ACLs (defense in depth) — rejected; the framework-side check duplicates substrate behavior without adding meaningful protection (see Rationale).
 
 ---
 
@@ -179,7 +182,7 @@ For non-platform mode, `Resolve(s)` returns `<prefix>.<s>` (FR-030). For platfor
 
 **Decision**: A configurable hook on the imp spec — `OnNote func(entity Entity, payload any)` — receives the payload from a `Note` verdict (FR-012). If the imp author does not register a hook, `Note` payloads are dropped after recording the verdict. Counters exposed alongside:
 - `inflight_reasoning` (gauge, `atomic.Int64`, satisfies FR-021b)
-- `decode_failures`, `extraction_failures`, `awareness_panics`, `awareness_errors`, `reasoning_panics`, `reasoning_errors`, `whitelist_violations`, `nak_total` (counters, `atomic.Uint64`)
+- `decode_failures`, `extraction_failures`, `awareness_panics`, `awareness_errors`, `reasoning_panics`, `reasoning_errors`, `nak_total` (counters, `atomic.Uint64`)
 
 These are read via `Imp.Metrics()` returning a struct snapshot. No Prometheus or external metrics dependency in v1.
 

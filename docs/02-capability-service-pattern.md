@@ -37,29 +37,19 @@ Service-level metadata in `$SRV.INFO` carries:
 
 Imps discover by querying `$SRV.INFO`, walking endpoint lists across replies, and checking declared subjects against their spec dependencies. The harness does this once at startup and exposes the resolved capability surface to the imp; imps do not query at request time.
 
-## Subject prefix convention
+## Subject convention
 
-Every subject a capability service registers an endpoint on follows a prefix convention determined by deployment mode.
+A capability service chooses the subject taxonomy under which it registers endpoints. The framework does not impose a subject convention on the service or rewrite anything on the imp side; per the constitution's "Imps see one subject path" principle, the subjects an imp declares are the subjects on the wire.
 
-**Non-platform mode** — the service runs in an account where its consumers also live. Subjects are prefixed with a configured `<prefix>`:
+The recommendation — not the requirement — is that the first token name the capability family (`knowledge.*`, `inference.*`, `tools.*`) so subjects are operator-readable at a glance.
 
-```
-<prefix>.<capability-specific-tokens>
-```
+**Same-account deployment** — service and imp live in the same NATS account. The service registers, say, `knowledge.episode.recall`; the imp publishes on `knowledge.episode.recall`. Subjects match directly.
 
-Example: `app.knowledge.episode.recall`, where `app` is the configured prefix.
+**Cross-account deployment** — service runs in a different NATS account (a "platform" account, a vendor account, etc.) and is *exported* from its account. The importing account configures the import: it can land the exported subject on the same name (`knowledge.episode.recall` → `knowledge.episode.recall`), or rewrite it to whatever the imp's account uses internally. The imp's view stays single-form.
 
-**Platform mode** — the service runs in a platform account and is exported to other accounts that import it. The calling account's public key is part of the subject path so the platform service can attribute every request:
+The capability service may want to scope its handling by attribution (which importer is calling). NATS accounts give the service the importer's identity as ambient context (`Message.Sub` / account headers); the subject does not need to encode the importer's public key explicitly. If a service does want a per-importer subject for routing reasons, that is its own design — the framework does not mandate it.
 
-```
-<prefix>.<account-pub-key>.<capability-specific-tokens>
-```
-
-Example: `platform.ABCD1234EFGH.knowledge.episode.recall`, where `ABCD1234EFGH` is the importing account's public key.
-
-Both modes are served by the same binary, configured by a `platform_mode` boolean. Endpoints, wire protocols, and discovery surfaces are identical across modes; only the subject path and the per-request account attribution differ.
-
-After the prefix, the subject taxonomy is each capability's own design. Inference uses `inference.<service-name>.{prompt,embed}`. Knowledge will use `knowledge.<variant>.{recall,remember}`. The framework does not dictate the post-prefix structure beyond the recommendation that the first post-prefix token name the capability family.
+Subject taxonomy is each capability's own design. Inference uses `inference.<service-name>.{prompt,embed}`. Knowledge will use `knowledge.<variant>.{recall,remember}`. The framework dictates nothing here beyond the namespacing recommendation above.
 
 ## Statelessness per request
 
