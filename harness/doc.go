@@ -8,15 +8,19 @@
 //   - Verdict: closed sum returned by awareness — Ignore, Note(payload),
 //     Wake(reason, entity).
 //   - AwarenessContext / ReasoningContext: typed surfaces; the energy
-//     gradient is structural — AwarenessContext has no Publish method
-//     and no Conn method, so calling awareness.Publish(...) or
-//     awareness.Conn() does not compile. ReasoningContext exposes
-//     Publish, InFlight, and Conn() *nats.Conn (the escape hatch for
-//     generic NATS-based clients).
+//     gradient is structural — AwarenessContext exposes State and
+//     Request only, so calling awareness.RequestMany(...), Publish(...),
+//     or Conn() does not compile. ReasoningContext exposes State,
+//     Publish, InFlight, Conn() *nats.Conn (the escape hatch for
+//     generic NATS-based clients), Request, and RequestMany.
+//   - RequestOption / RequestManyOption: per-call functional options;
+//     WithRequestTimeout, WithRequestManyWindow, WithRequestManyMax.
+//   - WithDefaultRequestTimeout / WithDefaultRequestManyWindow:
+//     harness-construction options for the request defaults (5s / 1s).
 //   - StateRef: per-entity state slot with Get/Set/Update.
-//   - Typed errors: ErrSpecInvalid, ErrCapExceeded, ErrUnknownStateShape,
-//     ErrConfigInvalid, ErrStreamNotFound, ErrConsumerIncompatible,
-//     ErrSubscriptionFailed.
+//   - Typed errors: ErrSpecInvalid, ErrConfigInvalid, ErrStreamNotFound,
+//     ErrConsumerIncompatible, ErrSubscriptionFailed, ErrNoResponders,
+//     ErrRequestTimeout (the latter unwraps to context.DeadlineExceeded).
 //
 // Channels are either core-NATS subject sources or JetStream stream
 // sources. The framework performs no subject transformation — declared
@@ -27,6 +31,12 @@
 //
 // Reasoning runs concurrently — each Wake verdict launches a fresh
 // goroutine and dispatch returns immediately.
+//
+// The outbound NATS surface is byte-shaped — Request and RequestMany
+// take and return []byte. No codec is imposed by the framework. The
+// harness performs no retry, no backoff, and no circuit-breaker: a
+// timeout failure does not produce a second NATS publish on the same
+// subject.
 //
 // Capabilities, the soulstream, schedule/KV channels, persistence, and
 // audit are explicitly out of scope and ship as separate features.

@@ -20,21 +20,30 @@ type metrics struct {
 	WakesDispatched    atomic.Uint64
 	IgnoredVerdicts    atomic.Uint64
 	NakTotal           atomic.Uint64
+
+	RequestCalls        atomic.Uint64
+	RequestManyCalls    atomic.Uint64
+	RequestNoResponders atomic.Uint64
+	RequestTimeouts     atomic.Uint64
 }
 
 func newMetrics() *metrics { return &metrics{} }
 
 func (m *metrics) snapshot() Metrics {
 	return Metrics{
-		InflightReasoning:  m.InflightReasoning.Load(),
-		DecodeFailures:     m.DecodeFailures.Load(),
-		ExtractionFailures: m.ExtractionFailures.Load(),
-		AwarenessPanics:    m.AwarenessPanics.Load(),
-		ReasoningPanics:    m.ReasoningPanics.Load(),
-		ReasoningErrors:    m.ReasoningErrors.Load(),
-		NotesDelivered:     m.NotesDelivered.Load(),
-		WakesDispatched:    m.WakesDispatched.Load(),
-		IgnoredVerdicts:    m.IgnoredVerdicts.Load(),
-		NakTotal:           m.NakTotal.Load(),
+		InflightReasoning:   m.InflightReasoning.Load(),
+		DecodeFailures:      m.DecodeFailures.Load(),
+		ExtractionFailures:  m.ExtractionFailures.Load(),
+		AwarenessPanics:     m.AwarenessPanics.Load(),
+		ReasoningPanics:     m.ReasoningPanics.Load(),
+		ReasoningErrors:     m.ReasoningErrors.Load(),
+		NotesDelivered:      m.NotesDelivered.Load(),
+		WakesDispatched:     m.WakesDispatched.Load(),
+		IgnoredVerdicts:     m.IgnoredVerdicts.Load(),
+		NakTotal:            m.NakTotal.Load(),
+		RequestCalls:        m.RequestCalls.Load(),
+		RequestManyCalls:    m.RequestManyCalls.Load(),
+		RequestNoResponders: m.RequestNoResponders.Load(),
+		RequestTimeouts:     m.RequestTimeouts.Load(),
 	}
 }

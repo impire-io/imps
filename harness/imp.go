@@ -137,8 +137,23 @@ func (i *Imp) Run(ctx context.Context) error {
 
 // bootRuntime creates the runtime bag exactly once.
 func (i *Imp) bootRuntime() error {
-	var err error
+	var bootErr error
 	i.rtOnce.Do(func() {
+		if i.opts.defaultRequestTimeout <= 0 {
+			bootErr = &ErrConfigInvalid{
+				Field:  "default_request_timeout",
+				Reason: "non-positive",
+			}
+			return
+		}
+		if i.opts.defaultRequestManyWindow <= 0 {
+			bootErr = &ErrConfigInvalid{
+				Field:  "default_request_many_window",
+				Reason: "non-positive",
+			}
+			return
+		}
+
 		m := newMetrics()
 		reg := newRegistry(i.spec.States)
 		lg := newLogger(i.opts.logHandler)
@@ -154,12 +169,20 @@ func (i *Imp) bootRuntime() error {
 			state:           lifecycle.New(),
 			stopped:         make(chan struct{}),
 		}
-		rt.awareness = &awarenessCtx{registry: reg}
+		rt.awareness = &awarenessCtx{
+			registry:              reg,
+			conn:                  i.nc,
+			metrics:               m,
+			logger:                lg,
+			defaultRequestTimeout: i.opts.defaultRequestTimeout,
+		}
 		rt.reasoning = &reasoningCtx{
-			registry: reg,
-			conn:     i.nc,
-			metrics:  m,
-			logger:   lg,
+			registry:                 reg,
+			conn:                     i.nc,
+			metrics:                  m,
+			logger:                   lg,
+			defaultRequestTimeout:    i.opts.defaultRequestTimeout,
+			defaultRequestManyWindow: i.opts.defaultRequestManyWindow,
 		}
 		rt.identity = ImpIdentity{
 			Name:    i.spec.Name,
@@ -167,7 +190,7 @@ func (i *Imp) bootRuntime() error {
 		}
 		i.rtPtr.Store(rt)
 	})
-	return err
+	return bootErr
 }
 
 // Shutdown initiates graceful shutdown: stops accepting new messages,

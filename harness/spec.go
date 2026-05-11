@@ -76,4 +76,18 @@ type Metrics struct {
 	WakesDispatched    uint64
 	IgnoredVerdicts    uint64
 	NakTotal           uint64
+
+	// RequestCalls is the total number of Request invocations (success +
+	// failure) across awareness and reasoning. Calls made via Conn() bypass
+	// this counter.
+	RequestCalls uint64
+	// RequestManyCalls is the total number of RequestMany invocations.
+	// Calls made via Conn() bypass this counter.
+	RequestManyCalls uint64
+	// RequestNoResponders is the number of Request (and publish-refused
+	// RequestMany) invocations that returned *ErrNoResponders.
+	RequestNoResponders uint64
+	// RequestTimeouts is the number of Request invocations that returned
+	// *ErrRequestTimeout.
+	RequestTimeouts uint64
 }

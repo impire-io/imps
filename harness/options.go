@@ -10,14 +10,18 @@ import (
 // populated from the variadic Option list passed to NewImp; defaults are
 // applied before any Option runs.
 type runtimeOptions struct {
-	drainWindow time.Duration
-	logHandler  slog.Handler
+	drainWindow              time.Duration
+	logHandler               slog.Handler
+	defaultRequestTimeout    time.Duration
+	defaultRequestManyWindow time.Duration
 }
 
 func defaultRuntimeOptions() runtimeOptions {
 	return runtimeOptions{
-		drainWindow: 30 * time.Second,
-		logHandler:  slog.NewTextHandler(io.Discard, nil),
+		drainWindow:              30 * time.Second,
+		logHandler:               slog.NewTextHandler(io.Discard, nil),
+		defaultRequestTimeout:    5 * time.Second,
+		defaultRequestManyWindow: 1 * time.Second,
 	}
 }
 
@@ -40,5 +44,25 @@ func WithLogger(h slog.Handler) Option {
 		if h != nil {
 			o.logHandler = h
 		}
+	}
+}
+
+// WithDefaultRequestTimeout sets the default per-call timeout applied to
+// Request invocations that do not supply WithRequestTimeout. Default is
+// 5 seconds. A non-positive duration is rejected at Run with
+// *ErrConfigInvalid.
+func WithDefaultRequestTimeout(d time.Duration) Option {
+	return func(o *runtimeOptions) {
+		o.defaultRequestTimeout = d
+	}
+}
+
+// WithDefaultRequestManyWindow sets the default collection window applied
+// to RequestMany invocations that do not supply WithRequestManyWindow.
+// Default is 1 second. A non-positive duration is rejected at Run with
+// *ErrConfigInvalid.
+func WithDefaultRequestManyWindow(d time.Duration) Option {
+	return func(o *runtimeOptions) {
+		o.defaultRequestManyWindow = d
 	}
 }

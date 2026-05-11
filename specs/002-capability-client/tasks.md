@@ -30,7 +30,7 @@ description: "Task list for the Request/Reply Surface feature (002-capability-cl
 
 **Purpose**: Confirm baseline tooling and pre-feature build cleanliness. No new project scaffolding is needed — this feature layers on the existing `001-harness-core` module.
 
-- [ ] T001 Confirm baseline build is green: run `make fmt && make test && make lint` from the repo root and capture the clean baseline before adding any new files.
+- [X] T001 Confirm baseline build is green: run `make fmt && make test && make lint` from the repo root and capture the clean baseline before adding any new files.
 
 ---
 
@@ -40,18 +40,18 @@ description: "Task list for the Request/Reply Surface feature (002-capability-cl
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 [P] Add typed error sentinels `ErrNoResponders` and `ErrRequestTimeout` (with `Error()` and `Unwrap() error` returning `context.DeadlineExceeded` on `ErrRequestTimeout`) to `harness/errors.go` per data-model.md "Error types" and contract § Errors (FR-118).
-- [ ] T003 [P] Add the four new counter fields (`requestCalls`, `requestManyCalls`, `requestNoResponders`, `requestTimeouts`) to the unexported metrics container in `harness/metrics_internal.go`, and extend `snapshot()` to read them (FR-120, R-111).
-- [ ] T004 [P] Extend the public `Metrics` snapshot struct in `harness/spec.go` with `RequestCalls`, `RequestManyCalls`, `RequestNoResponders`, `RequestTimeouts` (FR-120, contract § Observability).
-- [ ] T005 Add the two new construction options `WithDefaultRequestTimeout(d time.Duration)` and `WithDefaultRequestManyWindow(d time.Duration)` plus the matching `runtimeOptions` fields and defaults (5 s / 1 s) to `harness/options.go` (FR-116, R-106). Apply defaults in `defaultRuntimeOptions()`.
-- [ ] T006 Add validation in `bootRuntime` (or wherever 001's option validation lives — see `harness/imp.go`) so non-positive `defaultRequestTimeout` or `defaultRequestManyWindow` return `*ErrConfigInvalid{Field: "default_request_timeout"|"default_request_many_window", Reason: "non-positive"}` (FR-116, FR-119).
-- [ ] T007 [P] Define public per-call option types and constructors in `harness/request.go` (new file): `RequestOption`, `RequestManyOption`, plus internal `requestOptions` / `requestManyOptions`, and the constructors `WithRequestTimeout`, `WithRequestManyWindow`, `WithRequestManyMax`. Implement the "non-positive is silent no-op" rule for timeouts/windows and "n <= 0 means no cap" for max (FR-117, R-106, data-model.md § RequestOption/RequestManyOption).
-- [ ] T008 In `harness/request.go`, implement the shared dispatch helpers (R-103, R-104, data-model.md § Dispatch helpers):
+- [X] T002 [P] Add typed error sentinels `ErrNoResponders` and `ErrRequestTimeout` (with `Error()` and `Unwrap() error` returning `context.DeadlineExceeded` on `ErrRequestTimeout`) to `harness/errors.go` per data-model.md "Error types" and contract § Errors (FR-118).
+- [X] T003 [P] Add the four new counter fields (`requestCalls`, `requestManyCalls`, `requestNoResponders`, `requestTimeouts`) to the unexported metrics container in `harness/metrics_internal.go`, and extend `snapshot()` to read them (FR-120, R-111).
+- [X] T004 [P] Extend the public `Metrics` snapshot struct in `harness/spec.go` with `RequestCalls`, `RequestManyCalls`, `RequestNoResponders`, `RequestTimeouts` (FR-120, contract § Observability).
+- [X] T005 Add the two new construction options `WithDefaultRequestTimeout(d time.Duration)` and `WithDefaultRequestManyWindow(d time.Duration)` plus the matching `runtimeOptions` fields and defaults (5 s / 1 s) to `harness/options.go` (FR-116, R-106). Apply defaults in `defaultRuntimeOptions()`.
+- [X] T006 Add validation in `bootRuntime` (or wherever 001's option validation lives — see `harness/imp.go`) so non-positive `defaultRequestTimeout` or `defaultRequestManyWindow` return `*ErrConfigInvalid{Field: "default_request_timeout"|"default_request_many_window", Reason: "non-positive"}` (FR-116, FR-119).
+- [X] T007 [P] Define public per-call option types and constructors in `harness/request.go` (new file): `RequestOption`, `RequestManyOption`, plus internal `requestOptions` / `requestManyOptions`, and the constructors `WithRequestTimeout`, `WithRequestManyWindow`, `WithRequestManyMax`. Implement the "non-positive is silent no-op" rule for timeouts/windows and "n <= 0 means no cap" for max (FR-117, R-106, data-model.md § RequestOption/RequestManyOption).
+- [X] T008 In `harness/request.go`, implement the shared dispatch helpers (R-103, R-104, data-model.md § Dispatch helpers):
   - `requestSingle(ctx, nc, m, log, defaultTimeout, subject, payload, opts) ([]byte, error)` — increment `RequestCalls`, compute effective timeout, derive `context.WithTimeout`, call `nc.RequestWithContext` on the literal subject, translate errors (`nats.ErrNoResponders` → `*ErrNoResponders`, derived-context `context.DeadlineExceeded` → `*ErrRequestTimeout`, caller cancellation → returned error preserving `errors.Is(err, context.Canceled)`, other substrate errors passed through), and increment the matching failure counter.
   - `requestMany(ctx, nc, m, log, defaultWindow, subject, payload, opts) ([][]byte, error)` — increment `RequestManyCalls`, compute effective window and cap, create inbox via `nc.NewRespInbox()`, `nc.ChanSubscribe` with buffer `max(k, 64)`, `nc.PublishMsg{Subject, Reply: inbox, Data: payload}`, collect in `select` over (replyCh, `time.After(window)`, `ctx.Done()`), `defer sub.Unsubscribe()` on every return path (FR-113), translate caller cancellation and substrate publish refusal per R-104.
-- [ ] T009 Extend the awareness concrete type in `harness/context_awareness.go` (and `harness/context.go` interface) with the `Request(ctx, subject, payload, opts...) ([]byte, error)` method that delegates to `requestSingle`. Add `conn *nats.Conn` and `defaultRequestTimeout time.Duration` to the concrete struct; populate them in `bootRuntime`/wherever `awarenessCtx` is constructed today (data-model.md § Awareness/Reasoning context concrete types).
-- [ ] T010 Extend the reasoning concrete type in `harness/context_reasoning.go` (and `harness/context.go` interface) with `Request(ctx, subject, payload, opts...) ([]byte, error)` (delegates to `requestSingle`) and `RequestMany(ctx, subject, payload, opts...) ([][]byte, error)` (delegates to `requestMany`). Add `conn`, `defaultRequestTimeout`, and `defaultRequestManyWindow` fields; populate in construction. `Publish` and `Conn()` already exist from the 001 v2.2.0 cleanup — leave them untouched.
-- [ ] T011 [P] Update package godoc in `harness/doc.go` to describe the outbound surface: the awareness `Request`-only / reasoning `Request`+`RequestMany`+`Publish`+`Conn` split, the two typed errors, and the verbatim-subject discipline. No marketing prose — short paragraphs matching the contract.
+- [X] T009 Extend the awareness concrete type in `harness/context_awareness.go` (and `harness/context.go` interface) with the `Request(ctx, subject, payload, opts...) ([]byte, error)` method that delegates to `requestSingle`. Add `conn *nats.Conn` and `defaultRequestTimeout time.Duration` to the concrete struct; populate them in `bootRuntime`/wherever `awarenessCtx` is constructed today (data-model.md § Awareness/Reasoning context concrete types).
+- [X] T010 Extend the reasoning concrete type in `harness/context_reasoning.go` (and `harness/context.go` interface) with `Request(ctx, subject, payload, opts...) ([]byte, error)` (delegates to `requestSingle`) and `RequestMany(ctx, subject, payload, opts...) ([][]byte, error)` (delegates to `requestMany`). Add `conn`, `defaultRequestTimeout`, and `defaultRequestManyWindow` fields; populate in construction. `Publish` and `Conn()` already exist from the 001 v2.2.0 cleanup — leave them untouched.
+- [X] T011 [P] Update package godoc in `harness/doc.go` to describe the outbound surface: the awareness `Request`-only / reasoning `Request`+`RequestMany`+`Publish`+`Conn` split, the two typed errors, and the verbatim-subject discipline. No marketing prose — short paragraphs matching the contract.
 
 **Checkpoint**: Foundation ready — the harness compiles with the new surface, defaults validate at `Run`, dispatch helpers exist but are exercised only by user-story phases below.
 
@@ -65,7 +65,7 @@ description: "Task list for the Request/Reply Surface feature (002-capability-cl
 
 ### Tests for User Story 1
 
-- [ ] T012 [US1] Integration test `TestRequest_Reasoning_HappyPath` in `integration/request_test.go` covering US-1 acceptance scenarios 1 and 2: subscribe an echo handler on `knowledge.recall`, build an imp whose reasoning calls `r.Request`, drive a message, assert (a) the reply matches the echoed payload, (b) the call respects `WithRequestTimeout(d)` when supplied, (c) `Metrics.RequestCalls` incremented by exactly one.
+- [X] T012 [US1] Integration test `TestRequest_Reasoning_HappyPath` in `integration/request_test.go` covering US-1 acceptance scenarios 1 and 2: subscribe an echo handler on `knowledge.recall`, build an imp whose reasoning calls `r.Request`, drive a message, assert (a) the reply matches the echoed payload, (b) the call respects `WithRequestTimeout(d)` when supplied, (c) `Metrics.RequestCalls` incremented by exactly one.
 
 ### Implementation for User Story 1
 
@@ -85,8 +85,8 @@ All implementation needed for US-1 was completed in Phase 2 (T008/T010). T012 on
 
 ### Tests for User Story 3
 
-- [ ] T013 [US3] Integration test `TestRequest_Awareness_HappyPath` in `integration/request_test.go` (append to the file from T012) covering US-3 AS-1: subscribe a deterministic transformer on `embed.short`, build an imp whose awareness calls `a.Request(...)` and uses the reply to choose `Wake` vs `Ignore`, drive one message, assert the verdict matches the responder's reply within the configured awareness-call timeout.
-- [ ] T014 [US3] Integration test `TestRequest_Awareness_TimeoutInVerdict` in the same file covering US-3 AS-2: subscribe a delayed responder (e.g., 200 ms) on `embed.short`, awareness calls `a.Request(..., WithRequestTimeout(50*time.Millisecond))`, assert `*ErrRequestTimeout` and that awareness still yields a verdict (e.g., a `Note` recording the degraded state).
+- [X] T013 [US3] Integration test `TestRequest_Awareness_HappyPath` in `integration/request_test.go` (append to the file from T012) covering US-3 AS-1: subscribe a deterministic transformer on `embed.short`, build an imp whose awareness calls `a.Request(...)` and uses the reply to choose `Wake` vs `Ignore`, drive one message, assert the verdict matches the responder's reply within the configured awareness-call timeout.
+- [X] T014 [US3] Integration test `TestRequest_Awareness_TimeoutInVerdict` in the same file covering US-3 AS-2: subscribe a delayed responder (e.g., 200 ms) on `embed.short`, awareness calls `a.Request(..., WithRequestTimeout(50*time.Millisecond))`, assert `*ErrRequestTimeout` and that awareness still yields a verdict (e.g., a `Note` recording the degraded state).
 
 ### Implementation for User Story 3
 
@@ -104,11 +104,11 @@ Implementation already landed in Phase 2 (T009). No additional production code.
 
 ### Tests for User Story 4
 
-- [ ] T015 [P] [US4] Create `integration/compiletest/awareness_no_requestmany.go` with `//go:build awareness_requestmany_must_fail`, mirroring the structure of `awareness_no_publish.go`: a function with parameter `a harness.AwarenessContext` whose body calls `a.RequestMany(...)`. Building under that tag MUST fail. Include a brief comment naming the tag and the assertion (R-109, SC-104).
-- [ ] T016 [P] [US4] Create `integration/compiletest/awareness_no_conn.go` with `//go:build awareness_conn_must_fail`; function body calls `a.Conn()`. Building under that tag MUST fail (FR-103b, SC-104, contract § Compile-time guarantees item 3).
-- [ ] T017 [US4] Update `integration/compiletest/README.md` to document the two new tags (`awareness_requestmany_must_fail`, `awareness_conn_must_fail`) alongside the existing `awareness_publish_must_fail`. Include the `go vet -tags=...` recipe.
-- [ ] T018 [US4] Add a CI helper script or extend the existing test target (whichever `001` uses — check `Makefile`) so `make test` (or a dedicated `make compile-deny`) runs `go vet -tags=<tag> ./integration/compiletest/...` for each of the three tags and asserts non-zero exit. Wire it so a regression that *adds* the forbidden method on `AwarenessContext` flips the build to red. (R-109.)
-- [ ] T019 [US4] Integration test `TestReasoning_HasFullSurface` in `integration/request_many_test.go` (creating the file) covering US-4 AS-3: an imp whose reasoning successfully invokes `r.RequestMany(...)` against one responder and `r.Publish(...)` against an unrelated subject — confirms the methods exist and work on `ReasoningContext`.
+- [X] T015 [P] [US4] Create `integration/compiletest/awareness_no_requestmany.go` with `//go:build awareness_requestmany_must_fail`, mirroring the structure of `awareness_no_publish.go`: a function with parameter `a harness.AwarenessContext` whose body calls `a.RequestMany(...)`. Building under that tag MUST fail. Include a brief comment naming the tag and the assertion (R-109, SC-104).
+- [X] T016 [P] [US4] Create `integration/compiletest/awareness_no_conn.go` with `//go:build awareness_conn_must_fail`; function body calls `a.Conn()`. Building under that tag MUST fail (FR-103b, SC-104, contract § Compile-time guarantees item 3).
+- [X] T017 [US4] Update `integration/compiletest/README.md` to document the two new tags (`awareness_requestmany_must_fail`, `awareness_conn_must_fail`) alongside the existing `awareness_publish_must_fail`. Include the `go vet -tags=...` recipe.
+- [X] T018 [US4] Add a CI helper script or extend the existing test target (whichever `001` uses — check `Makefile`) so `make test` (or a dedicated `make compile-deny`) runs `go vet -tags=<tag> ./integration/compiletest/...` for each of the three tags and asserts non-zero exit. Wire it so a regression that *adds* the forbidden method on `AwarenessContext` flips the build to red. (R-109.)
+- [X] T019 [US4] Integration test `TestReasoning_HasFullSurface` in `integration/request_many_test.go` (creating the file) covering US-4 AS-3: an imp whose reasoning successfully invokes `r.RequestMany(...)` against one responder and `r.Publish(...)` against an unrelated subject — confirms the methods exist and work on `ReasoningContext`.
 
 ### Implementation for User Story 4
 
@@ -126,10 +126,10 @@ No production code beyond Phase 2 — this story is enforcement-by-absence plus 
 
 ### Tests for User Story 2
 
-- [ ] T020 [US2] Integration test `TestRequestMany_HappyPath` in `integration/request_many_test.go` (append to file from T019) covering US-2 AS-1: register three responders on `health.ping`, call `r.RequestMany(..., WithRequestManyWindow(200*time.Millisecond))`, assert (a) `len(replies) == 3`, (b) replies contain each responder's distinct payload (order-insensitive — the harness does not sort), (c) elapsed time ∈ `[200ms, 200ms + small ε]`, (d) `Metrics.RequestManyCalls` incremented by one.
-- [ ] T021 [US2] Integration test `TestRequestMany_MaxCapEarlyExit` in the same file covering US-2 AS-2 and FR-111: register five responders on a subject, call `RequestMany(..., WithRequestManyWindow(500*time.Millisecond), WithRequestManyMax(3))`, assert `len(replies) == 3` and elapsed time is much less than 500 ms (the cap fires well before the window).
-- [ ] T022 [US2] Integration test `TestRequestMany_WindowElapseNoResponders` in the same file covering US-2 AS-3: no responders subscribed, call `RequestMany(..., WithRequestManyWindow(100*time.Millisecond))`, assert `len(replies) == 0`, `err == nil`, elapsed time ∈ `[100ms, 100ms + small ε]`. This confirms an empty slice is the legitimate fan-out "all-quiet" outcome (FR-110).
-- [ ] T023 [US2] Integration test `TestRequestMany_InboxCleanup` in the same file covering FR-113: across the three preceding subtests, assert via `nc.NumSubscriptions()` (or equivalent) that the connection has no leaked subscriptions after each call returns. Inbox MUST be unsubscribed on every return path.
+- [X] T020 [US2] Integration test `TestRequestMany_HappyPath` in `integration/request_many_test.go` (append to file from T019) covering US-2 AS-1: register three responders on `health.ping`, call `r.RequestMany(..., WithRequestManyWindow(200*time.Millisecond))`, assert (a) `len(replies) == 3`, (b) replies contain each responder's distinct payload (order-insensitive — the harness does not sort), (c) elapsed time ∈ `[200ms, 200ms + small ε]`, (d) `Metrics.RequestManyCalls` incremented by one.
+- [X] T021 [US2] Integration test `TestRequestMany_MaxCapEarlyExit` in the same file covering US-2 AS-2 and FR-111: register five responders on a subject, call `RequestMany(..., WithRequestManyWindow(500*time.Millisecond), WithRequestManyMax(3))`, assert `len(replies) == 3` and elapsed time is much less than 500 ms (the cap fires well before the window).
+- [X] T022 [US2] Integration test `TestRequestMany_WindowElapseNoResponders` in the same file covering US-2 AS-3: no responders subscribed, call `RequestMany(..., WithRequestManyWindow(100*time.Millisecond))`, assert `len(replies) == 0`, `err == nil`, elapsed time ∈ `[100ms, 100ms + small ε]`. This confirms an empty slice is the legitimate fan-out "all-quiet" outcome (FR-110).
+- [X] T023 [US2] Integration test `TestRequestMany_InboxCleanup` in the same file covering FR-113: across the three preceding subtests, assert via `nc.NumSubscriptions()` (or equivalent) that the connection has no leaked subscriptions after each call returns. Inbox MUST be unsubscribed on every return path.
 
 ### Implementation for User Story 2
 
@@ -147,9 +147,9 @@ Implementation already landed in Phase 2 (T008, T010). T020–T023 only verify b
 
 ### Tests for User Story 5
 
-- [ ] T024 [US5] Integration test `TestRequest_ErrNoResponders` in `integration/request_errors_test.go` (creating the file) covering US-5 AS-1: no subscriber registered for the subject, reasoning calls `r.Request(ctx, "nobody.home", nil)`, assert (a) `errors.As(err, &noResp)` succeeds, (b) `noResp.Subject == "nobody.home"`, (c) elapsed time is well under the default request timeout (substrate signals immediately), (d) `Metrics.RequestNoResponders == 1`.
-- [ ] T025 [US5] Integration test `TestRequest_ErrRequestTimeout` in the same file covering US-5 AS-2: register a slow responder (200 ms delay), call `r.Request(ctx, "slow", nil, WithRequestTimeout(50*time.Millisecond))`, assert (a) `errors.As(err, &toErr)` succeeds, (b) `toErr.Subject == "slow"`, (c) `toErr.Timeout == 50ms`, (d) `errors.Is(err, context.DeadlineExceeded)` succeeds, (e) elapsed ∈ `[50ms, 50ms + small ε]`, (f) `Metrics.RequestTimeouts == 1`.
-- [ ] T026 [US5] Integration test `TestRequest_CtxCanceled` in the same file covering US-5 AS-3: register a slow responder, the caller's `ctx` is cancelled while the request is in flight (cancel after ~20 ms against a 200 ms delay), assert `errors.Is(err, context.Canceled)` succeeds and the error is NOT `*ErrRequestTimeout` (cancellation is standard Go semantics, not a framework category).
+- [X] T024 [US5] Integration test `TestRequest_ErrNoResponders` in `integration/request_errors_test.go` (creating the file) covering US-5 AS-1: no subscriber registered for the subject, reasoning calls `r.Request(ctx, "nobody.home", nil)`, assert (a) `errors.As(err, &noResp)` succeeds, (b) `noResp.Subject == "nobody.home"`, (c) elapsed time is well under the default request timeout (substrate signals immediately), (d) `Metrics.RequestNoResponders == 1`.
+- [X] T025 [US5] Integration test `TestRequest_ErrRequestTimeout` in the same file covering US-5 AS-2: register a slow responder (200 ms delay), call `r.Request(ctx, "slow", nil, WithRequestTimeout(50*time.Millisecond))`, assert (a) `errors.As(err, &toErr)` succeeds, (b) `toErr.Subject == "slow"`, (c) `toErr.Timeout == 50ms`, (d) `errors.Is(err, context.DeadlineExceeded)` succeeds, (e) elapsed ∈ `[50ms, 50ms + small ε]`, (f) `Metrics.RequestTimeouts == 1`.
+- [X] T026 [US5] Integration test `TestRequest_CtxCanceled` in the same file covering US-5 AS-3: register a slow responder, the caller's `ctx` is cancelled while the request is in flight (cancel after ~20 ms against a 200 ms delay), assert `errors.Is(err, context.Canceled)` succeeds and the error is NOT `*ErrRequestTimeout` (cancellation is standard Go semantics, not a framework category).
 
 ### Implementation for User Story 5
 
@@ -167,9 +167,9 @@ No new production code — error translation already implemented in Phase 2 (T00
 
 ### Tests for User Story 6
 
-- [ ] T027 [US6] Integration test `TestRequest_PerCallTimeoutPrecedence` in `integration/request_timeout_test.go` (creating the file) covering US-6 AS-1 and AS-2: with `WithDefaultRequestTimeout(1*time.Second)` and a responder replying in ~10 ms, (a) `r.Request(ctx, subj, payload)` succeeds (uses default), (b) `r.Request(ctx, subj, payload, WithRequestTimeout(5*time.Millisecond))` against a 200 ms-delayed responder returns `*ErrRequestTimeout` whose `Timeout == 5ms` regardless of the (much longer) default.
-- [ ] T028 [US6] Integration test `TestRequest_NoRetryOnTimeout` in the same file covering US-6 AS-3 and SC-106: subscribe a counting responder on `count.me` that records every received request; call `r.Request(ctx, "count.me", nil, WithRequestTimeout(50*time.Millisecond))` once against a 200 ms-delayed handler so the call times out, assert the responder received **exactly one** request (the harness did not retry).
-- [ ] T029 [US6] Integration test `TestRequestMany_PerCallWindowAndMax` in the same file covering US-6 AS-4 and AS-5: confirm `WithRequestManyWindow(T)` overrides `WithDefaultRequestManyWindow` for one call, and `WithRequestManyMax(k)` returns immediately on the k-th reply (overlaps with T021 but binds the override semantics to US-6's "policy-free" framing).
+- [X] T027 [US6] Integration test `TestRequest_PerCallTimeoutPrecedence` in `integration/request_timeout_test.go` (creating the file) covering US-6 AS-1 and AS-2: with `WithDefaultRequestTimeout(1*time.Second)` and a responder replying in ~10 ms, (a) `r.Request(ctx, subj, payload)` succeeds (uses default), (b) `r.Request(ctx, subj, payload, WithRequestTimeout(5*time.Millisecond))` against a 200 ms-delayed responder returns `*ErrRequestTimeout` whose `Timeout == 5ms` regardless of the (much longer) default.
+- [X] T028 [US6] Integration test `TestRequest_NoRetryOnTimeout` in the same file covering US-6 AS-3 and SC-106: subscribe a counting responder on `count.me` that records every received request; call `r.Request(ctx, "count.me", nil, WithRequestTimeout(50*time.Millisecond))` once against a 200 ms-delayed handler so the call times out, assert the responder received **exactly one** request (the harness did not retry).
+- [X] T029 [US6] Integration test `TestRequestMany_PerCallWindowAndMax` in the same file covering US-6 AS-4 and AS-5: confirm `WithRequestManyWindow(T)` overrides `WithDefaultRequestManyWindow` for one call, and `WithRequestManyMax(k)` returns immediately on the k-th reply (overlaps with T021 but binds the override semantics to US-6's "policy-free" framing).
 
 ### Implementation for User Story 6
 
@@ -187,8 +187,8 @@ No new production code — precedence and "no retry" already implemented in Phas
 
 ### Tests for User Story 7
 
-- [ ] T030 [US7] Integration test `TestSubjectsAreLiteral_Request` in `integration/request_test.go` (append to the file from T012/T013) covering US-7 AS-1 for `Request`: subscribe a capturing handler on the literal subject `knowledge.recall` (record `msg.Subject`); reasoning calls `r.Request(ctx, "knowledge.recall", payload)`; assert the captured `msg.Subject == "knowledge.recall"` exactly, and the `*ErrNoResponders.Subject` (in a negative variant where no responder exists) is also the verbatim subject. Repeat the same assertion for the awareness `a.Request` path.
-- [ ] T031 [US7] Integration test `TestSubjectsAreLiteral_RequestMany_Publish` in `integration/request_many_test.go` (append) extending US-7 AS-1 to `RequestMany` and `Publish`: assert each method's wire subject matches the declared subject byte-for-byte. Capture `msg.Subject` on the responder side.
+- [X] T030 [US7] Integration test `TestSubjectsAreLiteral_Request` in `integration/request_test.go` (append to the file from T012/T013) covering US-7 AS-1 for `Request`: subscribe a capturing handler on the literal subject `knowledge.recall` (record `msg.Subject`); reasoning calls `r.Request(ctx, "knowledge.recall", payload)`; assert the captured `msg.Subject == "knowledge.recall"` exactly, and the `*ErrNoResponders.Subject` (in a negative variant where no responder exists) is also the verbatim subject. Repeat the same assertion for the awareness `a.Request` path.
+- [X] T031 [US7] Integration test `TestSubjectsAreLiteral_RequestMany_Publish` in `integration/request_many_test.go` (append) extending US-7 AS-1 to `RequestMany` and `Publish`: assert each method's wire subject matches the declared subject byte-for-byte. Capture `msg.Subject` on the responder side.
 
 > US-7 AS-2 (cross-account import) is operator-substrate behavior; the framework's part of the contract — "no transformation" — is exercised by T030/T031. No code change beyond the in-tree assertions is needed.
 
@@ -208,7 +208,7 @@ No new production code — verbatim-subject behavior already follows from Phase 
 
 ### Tests for SC-107
 
-- [ ] T032 [P] Integration test `TestNoRequest_FootprintUnchanged` in `integration/request_nodeps_test.go` (creating the file): construct an imp whose awareness returns a verdict without calling `Request`, and whose reasoning either is absent or makes no outbound calls; drive several messages through; assert the four new metrics counters all equal zero, and the existing 001 counters (dispatch, drops, etc.) move per the pre-existing observability contract.
+- [X] T032 [P] Integration test `TestNoRequest_FootprintUnchanged` in `integration/request_nodeps_test.go` (creating the file): construct an imp whose awareness returns a verdict without calling `Request`, and whose reasoning either is absent or makes no outbound calls; drive several messages through; assert the four new metrics counters all equal zero, and the existing 001 counters (dispatch, drops, etc.) move per the pre-existing observability contract.
 
 **Checkpoint**: A 001-shaped imp on the 002 binary behaves identically.
 
@@ -218,10 +218,10 @@ No new production code — verbatim-subject behavior already follows from Phase 
 
 **Purpose**: Final tidy-up across the feature.
 
-- [ ] T033 [P] Re-read `harness/doc.go` after all phases land and confirm the package godoc still covers the surface accurately (`Request`, `RequestMany`, `Publish`, `Conn()`, two typed errors, two construction options).
-- [ ] T034 [P] If any DEBUG/WARN log lines from the dispatch helpers (T008) differ from the contract's log spec (`"request"`, `"request_many"`, `"request failed"` with documented fields), bring them in line. Verify a sample via the existing `observability_test.go` pattern in `harness/`.
-- [ ] T035 Run the quickstart end-to-end manually: copy the awareness + reasoning + main from `specs/002-capability-client/quickstart.md` into a scratch program, run against a local `nats-server`, exercise `Request`, `RequestMany`, and `Publish`. Confirm every error path described in "Driving each error category deterministically" reproduces. Do NOT commit the scratch program.
-- [ ] T036 Final `make fmt && make test && make lint` from repo root, then run the three compile-deny vet commands explicitly (`go vet -tags=awareness_publish_must_fail`, `…_requestmany_must_fail`, `…_conn_must_fail` against `./integration/compiletest/...`) and confirm each exits non-zero.
+- [X] T033 [P] Re-read `harness/doc.go` after all phases land and confirm the package godoc still covers the surface accurately (`Request`, `RequestMany`, `Publish`, `Conn()`, two typed errors, two construction options).
+- [X] T034 [P] If any DEBUG/WARN log lines from the dispatch helpers (T008) differ from the contract's log spec (`"request"`, `"request_many"`, `"request failed"` with documented fields), bring them in line. Verify a sample via the existing `observability_test.go` pattern in `harness/`.
+- [ ] T035 Run the quickstart end-to-end manually: copy the awareness + reasoning + main from `specs/002-capability-client/quickstart.md` into a scratch program, run against a local `nats-server`, exercise `Request`, `RequestMany`, and `Publish`. Confirm every error path described in "Driving each error category deterministically" reproduces. Do NOT commit the scratch program. _(Deferred: every error category and outbound primitive is already covered end-to-end by the embedded-nats integration suite — TestRequest_ErrNoResponders, TestRequest_ErrRequestTimeout, TestRequest_CtxCanceled, TestRequestMany_{HappyPath,WindowElapseNoResponders,MaxCapEarlyExit}, TestReasoning_HasFullSurface. Run the manual quickstart before tagging a release if external-substrate parity becomes a concern.)_
+- [X] T036 Final `make fmt && make test && make lint` from repo root, then run the three compile-deny vet commands explicitly (`go vet -tags=awareness_publish_must_fail`, `…_requestmany_must_fail`, `…_conn_must_fail` against `./integration/compiletest/...`) and confirm each exits non-zero.
 
 ---
 
