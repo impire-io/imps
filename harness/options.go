@@ -10,17 +10,18 @@ import (
 // populated from the variadic Option list passed to NewImp; defaults are
 // applied before any Option runs.
 type runtimeOptions struct {
-	drainWindow       time.Duration
-	logHandler        slog.Handler
-	subjectPrefix     string
-	platformMode      bool
-	importerAccountPK string
+	drainWindow              time.Duration
+	logHandler               slog.Handler
+	defaultRequestTimeout    time.Duration
+	defaultRequestManyWindow time.Duration
 }
 
 func defaultRuntimeOptions() runtimeOptions {
 	return runtimeOptions{
-		drainWindow: 30 * time.Second,
-		logHandler:  slog.NewTextHandler(io.Discard, nil),
+		drainWindow:              30 * time.Second,
+		logHandler:               slog.NewTextHandler(io.Discard, nil),
+		defaultRequestTimeout:    5 * time.Second,
+		defaultRequestManyWindow: 1 * time.Second,
 	}
 }
 
@@ -46,21 +47,22 @@ func WithLogger(h slog.Handler) Option {
 	}
 }
 
-// WithSubjectPrefix sets the subject prefix used for channel subscription
-// and action-publish resolution. Required in non-platform mode; also used
-// as the leading segment in platform mode.
-func WithSubjectPrefix(prefix string) Option {
+// WithDefaultRequestTimeout sets the default per-call timeout applied to
+// Request invocations that do not supply WithRequestTimeout. Default is
+// 5 seconds. A non-positive duration is rejected at Run with
+// *ErrConfigInvalid.
+func WithDefaultRequestTimeout(d time.Duration) Option {
 	return func(o *runtimeOptions) {
-		o.subjectPrefix = prefix
+		o.defaultRequestTimeout = d
 	}
 }
 
-// WithPlatformMode switches the resolver to platform mode and sets the
-// importer account public key segment. The resolved subject becomes
-// "<prefix>.<importerAccountPK>.<declared>".
-func WithPlatformMode(importerAccountPK string) Option {
+// WithDefaultRequestManyWindow sets the default collection window applied
+// to RequestMany invocations that do not supply WithRequestManyWindow.
+// Default is 1 second. A non-positive duration is rejected at Run with
+// *ErrConfigInvalid.
+func WithDefaultRequestManyWindow(d time.Duration) Option {
 	return func(o *runtimeOptions) {
-		o.platformMode = true
-		o.importerAccountPK = importerAccountPK
+		o.defaultRequestManyWindow = d
 	}
 }

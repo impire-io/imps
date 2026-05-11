@@ -21,21 +21,18 @@ func NewImp(spec ImpSpec, nc *nats.Conn, opts ...Option) (*Imp, error)
 ```go
 type Option func(*runtimeOptions)
 
-func WithDrainWindow(d time.Duration) Option        // default 30 s
-func WithLogger(h slog.Handler) Option              // default discard
-func WithSubjectPrefix(prefix string) Option        // required in non-platform mode
-func WithPlatformMode(importerAccountPK string) Option  // switches to platform-mode resolution
+func WithDrainWindow(d time.Duration) Option  // default 30 s
+func WithLogger(h slog.Handler) Option        // default discard
 ```
 
 Defaults:
 - `WithDrainWindow` → `30 * time.Second`
 - `WithLogger` → discard handler
-- non-platform mode unless `WithPlatformMode` is supplied
-- empty prefix unless `WithSubjectPrefix` is supplied
 
-Startup config validation (at `Run`, not at `NewImp`):
-- non-platform mode + empty prefix → `ErrConfigInvalid`
-- platform mode + empty importer account public key → `ErrConfigInvalid` (FR-033)
+The harness has no subject-prefix option. Per the constitution's "Imps
+see one subject path" principle (v2.2.0), a declared subject is the
+substrate subject verbatim. Cross-account routing and tenant scoping
+are configured at the substrate via NATS account imports.
 
 ---
 
@@ -62,17 +59,20 @@ func (i *Imp) Run(ctx context.Context) error
 // Calling Shutdown more than once is safe (subsequent calls return nil).
 // Shutdown can be called from any goroutine.
 func (i *Imp) Shutdown(ctx context.Context) error
+
+// Ready reports whether the imp has finished startup and is dispatching
+// messages. Useful as a readiness signal for tests and for callers that
+// need to wait for subscriptions to register before publishing.
+func (i *Imp) Ready() bool
 ```
 
 ```go
-// Identity returns the running imp's name, version, and resolved subject prefix.
-// Available during Running, Draining, and Stopped states (FR-003).
+// Identity returns the running imp's name and version (FR-003).
 func (i *Imp) Identity() ImpIdentity
 
 type ImpIdentity struct {
-    Name          string
-    Version       string
-    SubjectPrefix string
+    Name    string
+    Version string
 }
 ```
 
@@ -82,17 +82,16 @@ type ImpIdentity struct {
 func (i *Imp) Metrics() Metrics
 
 type Metrics struct {
-    InflightReasoning   int64
-    DecodeFailures      uint64
-    ExtractionFailures  uint64
-    AwarenessPanics     uint64
-    ReasoningPanics     uint64
-    ReasoningErrors     uint64
-    WhitelistViolations uint64
-    NotesDelivered      uint64
-    WakesDispatched     uint64
-    IgnoredVerdicts     uint64
-    NakTotal            uint64
+    InflightReasoning  int64
+    DecodeFailures     uint64
+    ExtractionFailures uint64
+    AwarenessPanics    uint64
+    ReasoningPanics    uint64
+    ReasoningErrors    uint64
+    NotesDelivered     uint64
+    WakesDispatched    uint64
+    IgnoredVerdicts    uint64
+    NakTotal           uint64
 }
 ```
 
@@ -108,10 +107,13 @@ type ImpSpec struct {
     Awareness AwarenessFn
     Reasoning ReasoningFn
     States    []StateShape
-    Actions   []string                      // declared subjects, pre-resolution
     OnNote    func(entity Entity, payload any)  // optional
 }
 ```
+
+The spec carries no outbound subject whitelist. Subject permissioning
+is the substrate's concern (NATS account ACLs on the connection),
+configured outside the framework.
 
 ```go
 type Entity string  // empty Entity ("") is invalid
@@ -133,13 +135,13 @@ type ChannelSpec struct {
 type Source interface{ isSource() }
 
 type SubjectSource struct {
-    Subject string  // pre-resolution subject or pattern
+    Subject string  // literal — the framework subscribes on this verbatim
 }
 func (SubjectSource) isSource() {}
 
 type StreamSource struct {
     Stream         string
-    FilterSubject  string  // pre-resolution
+    FilterSubject  string  // literal
     Durable        string  // empty = ephemeral consumer
     ConsumerConfig ConsumerConfig
 }
@@ -161,8 +163,8 @@ type Decoder func(msg Message) (any, error)
 type EntityExtractor func(decoded any) (Entity, error)
 
 // Message is the harness's view of an inbound substrate message.
-// Subject is the resolved subject the message arrived on. Headers and Data
-// are passthroughs from NATS. Ack/NAK is owned by the harness (not exposed
+// Subject is the subject the message arrived on. Headers and Data are
+// passthroughs from NATS. Ack/NAK is owned by the harness (not exposed
 // here) so user code cannot short-circuit FR-008a's ack timing.
 type Message struct {
     Subject string
@@ -186,7 +188,7 @@ type AwarenessFn func(
 
 type AwarenessContext interface {
     State(name string, entity Entity) (StateRef, error)
-    // No Publish method. Compile-time enforcement of FR-014.
+    // No Publish method. No Conn method. Compile-time enforcement of FR-014.
 }
 ```
 
@@ -206,10 +208,15 @@ type ReasoningFn func(
 
 type ReasoningContext interface {
     State(name string, entity Entity) (StateRef, error)
-    Publish(ctx context.Context, subject string, payload []byte) error
-    InFlight() int  // FR-021b — current in-flight reasoning count for this imp
+    Publish(ctx context.Context, subject string, payload []byte) error  // verbatim subject
+    InFlight() int                                                       // FR-021b
+    Conn() *nats.Conn                                                    // FR-029
 }
 ```
+
+`Conn()` is the escape hatch for generic NATS-based clients used from
+reasoning. Awareness has no equivalent method — the absence is the
+structural enforcement of the energy gradient.
 
 The `ctx` passed to reasoning is the harness shutdown context — cancelled when shutdown begins, allowing cooperative cancellation. Reasoning that does not respect ctx-cancel runs until completion or the drain window elapses.
 
@@ -268,14 +275,13 @@ type ErrSpecInvalid struct{ Field, Reason string }
 type ErrDuplicateStateShape struct{ Shape string }
 type ErrUnknownStateShape struct{ Shape string }
 type ErrCapExceeded struct{ Shape string; Count int }
-type ErrWhitelistViolation struct{ Subject string }
 type ErrConfigInvalid struct{ Field, Reason string }
 type ErrStreamNotFound struct{ Stream string }
 type ErrConsumerIncompatible struct{ Consumer, Diff string }
 type ErrSubscriptionFailed struct{ Subject string; Cause error }
 ```
 
-Each error's `Error()` message names the offending value (FR-002, FR-005a, FR-005c, FR-024, FR-026, FR-027, FR-033).
+Each error's `Error()` message names the offending value (FR-002, FR-005a, FR-005c, FR-024, FR-026).
 
 ---
 
@@ -286,6 +292,9 @@ The following must hold at compile time, not at runtime:
 1. `var _ = func(a AwarenessContext) { a.Publish(...) }` MUST fail to compile.
    The integration suite includes a build-tagged file under `integration/compiletest/` whose presence-of-build-failure is the assertion (SC-006).
 
-2. `Verdict` MUST not be constructible with a value that is neither Ignore, Note, nor Wake. A test in the verdict package attempts to forge one and confirms the discriminator is unexported.
+2. `var _ = func(a AwarenessContext) { a.Conn() }` MUST fail to compile.
+   Awareness has no `Conn()` accessor; the framework's outbound surface is gated by what the context exposes.
 
-3. `Source` MUST not be implementable outside the `harness` package. The `isSource()` method is unexported.
+3. `Verdict` MUST not be constructible with a value that is neither Ignore, Note, nor Wake. A test in the verdict package attempts to forge one and confirms the discriminator is unexported.
+
+4. `Source` MUST not be implementable outside the `harness` package. The `isSource()` method is unexported.

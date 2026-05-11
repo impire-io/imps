@@ -60,14 +60,13 @@ func streamSpec(awareness harness.AwarenessFn, durable string, reasoning harness
 		}},
 		Awareness: awareness,
 		Reasoning: reasoning,
-		Actions:   []string{"actions.out"},
 	}
 }
 
 func runStreamImp(t *testing.T, nc *nats.Conn, spec harness.ImpSpec, opts ...harness.Option) (*harness.Imp, func()) {
 	t.Helper()
 	defaults := []harness.Option{
-		harness.WithSubjectPrefix("test"),
+
 		harness.WithDrainWindow(1 * time.Second),
 	}
 	imp, err := harness.NewImp(spec, nc, append(defaults, opts...)...)
@@ -80,7 +79,7 @@ func runStreamImp(t *testing.T, nc *nats.Conn, spec harness.ImpSpec, opts ...har
 
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		if imp.Identity().SubjectPrefix != "" {
+		if imp.Ready() {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -99,13 +98,13 @@ func runStreamImp(t *testing.T, nc *nats.Conn, spec harness.ImpSpec, opts ...har
 }
 
 func TestStreamChannelDurableHappyPath(t *testing.T) {
-	// stream subject must match the resolved channel subject — non-platform
-	// mode prefix "test" + channel "orders.created" → "test.orders.created".
-	nc, _ := streamSetup(t, "ORDERS", "test.orders.created")
+	// Stream and channel FilterSubject are both literal "orders.created";
+	// the framework performs no subject transformation.
+	nc, _ := streamSetup(t, "ORDERS", "orders.created")
 
 	// First run: publish, observe action.
 	publishedAction := make(chan []byte, 4)
-	if _, err := nc.Subscribe("test.actions.out", func(m *nats.Msg) { publishedAction <- m.Data }); err != nil {
+	if _, err := nc.Subscribe("actions.out", func(m *nats.Msg) { publishedAction <- m.Data }); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
@@ -123,7 +122,7 @@ func TestStreamChannelDurableHappyPath(t *testing.T) {
 	)
 
 	imp1, cleanup1 := runStreamImp(t, nc, spec)
-	if err := nc.Publish("test.orders.created", []byte("first")); err != nil {
+	if err := nc.Publish("orders.created", []byte("first")); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -140,7 +139,7 @@ func TestStreamChannelDurableHappyPath(t *testing.T) {
 	// resumes (no double delivery of "first") and processes the new one.
 	imp2, cleanup2 := runStreamImp(t, nc, spec)
 	defer cleanup2()
-	if err := nc.Publish("test.orders.created", []byte("second")); err != nil {
+	if err := nc.Publish("orders.created", []byte("second")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -162,7 +161,7 @@ func TestStreamChannelDurableHappyPath(t *testing.T) {
 }
 
 func TestEphemeralConsumerLifecycle(t *testing.T) {
-	nc, js := streamSetup(t, "ORDERS", "test.orders.created")
+	nc, js := streamSetup(t, "ORDERS", "orders.created")
 
 	consumerCountBefore := countConsumers(t, js, "ORDERS")
 
@@ -219,7 +218,7 @@ func TestStreamNotFound(t *testing.T) {
 		func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil },
 	)
 
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+	imp, err := harness.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,7 +233,7 @@ func TestStreamNotFound(t *testing.T) {
 }
 
 func TestConsumerIncompatible(t *testing.T) {
-	nc, js := streamSetup(t, "ORDERS", "test.orders.created")
+	nc, js := streamSetup(t, "ORDERS", "orders.created")
 
 	// Pre-create a durable consumer with a DIFFERENT filter subject.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -256,7 +255,7 @@ func TestConsumerIncompatible(t *testing.T) {
 		func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil },
 	)
 
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+	imp, err := harness.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +273,7 @@ func TestConsumerIncompatible(t *testing.T) {
 }
 
 func TestAckAtAwarenessCompletion(t *testing.T) {
-	nc, js := streamSetup(t, "ORDERS", "test.orders.created")
+	nc, js := streamSetup(t, "ORDERS", "orders.created")
 
 	spec := streamSpec(
 		func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
@@ -294,7 +293,7 @@ func TestAckAtAwarenessCompletion(t *testing.T) {
 	_, cleanup := runStreamImp(t, nc, spec)
 	defer cleanup()
 
-	if err := nc.Publish("test.orders.created", []byte("payload")); err != nil {
+	if err := nc.Publish("orders.created", []byte("payload")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -330,7 +329,7 @@ func TestAckAtAwarenessCompletion(t *testing.T) {
 }
 
 func TestStreamNakOnFailures(t *testing.T) {
-	nc, _ := streamSetup(t, "ORDERS", "test.orders.created")
+	nc, _ := streamSetup(t, "ORDERS", "orders.created")
 
 	var awarenessCalls atomic.Int32
 	spec := streamSpec(
@@ -375,7 +374,7 @@ func TestStreamNakOnFailures(t *testing.T) {
 	defer cleanup()
 
 	for _, payload := range []string{"decode-fail", "extract-fail", "panic"} {
-		if err := nc.Publish("test.orders.created", []byte(payload)); err != nil {
+		if err := nc.Publish("orders.created", []byte(payload)); err != nil {
 			t.Fatal(err)
 		}
 	}

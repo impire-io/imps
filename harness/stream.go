@@ -41,8 +41,7 @@ func (i *Imp) bindStreamChannel(spec ChannelSpec, src StreamSource) error {
 		return err
 	}
 
-	resolvedFilter := i.runtime().resolver.resolve(src.FilterSubject)
-	desired := buildConsumerConfig(src, resolvedFilter)
+	desired := buildConsumerConfig(src, src.FilterSubject)
 
 	consumer, consumerName, ephemeral, err := i.resolveConsumer(ctx, stream, src, desired)
 	if err != nil {
@@ -50,11 +49,11 @@ func (i *Imp) bindStreamChannel(spec ChannelSpec, src StreamSource) error {
 	}
 
 	state := &channelState{
-		spec:            spec,
-		resolvedSubject: resolvedFilter,
-		consumerName:    consumerName,
-		stream:          src.Stream,
-		ephemeral:       ephemeral,
+		spec:         spec,
+		subject:      src.FilterSubject,
+		consumerName: consumerName,
+		stream:       src.Stream,
+		ephemeral:    ephemeral,
 	}
 
 	cc, err := consumer.Consume(func(msg jetstream.Msg) {
@@ -67,14 +66,14 @@ func (i *Imp) bindStreamChannel(spec ChannelSpec, src StreamSource) error {
 			_ = stream.DeleteConsumer(delCtx, consumerName)
 			delCancel()
 		}
-		return &ErrSubscriptionFailed{Subject: resolvedFilter, Cause: err}
+		return &ErrSubscriptionFailed{Subject: src.FilterSubject, Cause: err}
 	}
 	state.streamConsume = cc
 	i.runtime().channels = append(i.runtime().channels, state)
 	i.runtime().streams = append(i.runtime().streams, stream)
 	i.runtime().logger.info("channel ready",
 		"channel", spec.Name,
-		"resolved", resolvedFilter,
+		"subject", src.FilterSubject,
 		"kind", "stream",
 		"stream", src.Stream,
 		"consumer", consumerName,

@@ -33,8 +33,7 @@ func noteSpec(awareness harness.AwarenessFn, onNote func(harness.Entity, any)) h
 		Reasoning: func(ctx context.Context, _ any, _ harness.Entity, r harness.ReasoningContext) error {
 			return r.Publish(ctx, "actions.out", []byte("reasoned"))
 		},
-		OnNote:  onNote,
-		Actions: []string{"actions.out"},
+		OnNote: onNote,
 	}
 }
 
@@ -51,7 +50,7 @@ func TestIgnoreVerdict(t *testing.T) {
 		func(_ harness.Entity, p any) { notes <- p },
 	)
 
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+	imp, err := harness.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,14 +61,14 @@ func TestIgnoreVerdict(t *testing.T) {
 
 	// Watch actions.out to confirm no reasoning was queued.
 	got := make(chan struct{}, 1)
-	if _, err := nc.Subscribe("test.actions.out", func(*nats.Msg) { got <- struct{}{} }); err != nil {
+	if _, err := nc.Subscribe("actions.out", func(*nats.Msg) { got <- struct{}{} }); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := nc.Publish("test.messages.in", []byte("ignore-me")); err != nil {
+	if err := nc.Publish("messages.in", []byte("ignore-me")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -108,7 +107,7 @@ func TestNoteVerdict(t *testing.T) {
 		func(_ harness.Entity, p any) { gotNote <- p },
 	)
 
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+	imp, err := harness.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,14 +117,14 @@ func TestNoteVerdict(t *testing.T) {
 	waitReady(t, imp)
 
 	gotAction := make(chan struct{}, 1)
-	if _, err := nc.Subscribe("test.actions.out", func(*nats.Msg) { gotAction <- struct{}{} }); err != nil {
+	if _, err := nc.Subscribe("actions.out", func(*nats.Msg) { gotAction <- struct{}{} }); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := nc.Publish("test.messages.in", []byte("payload")); err != nil {
+	if err := nc.Publish("messages.in", []byte("payload")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -178,7 +177,7 @@ func TestWakeVerdictAsync(t *testing.T) {
 		return r.Publish(ctx, "actions.out", []byte(reason.(string)))
 	}
 
-	imp, err := harness.NewImp(spec, nc, harness.WithSubjectPrefix("test"))
+	imp, err := harness.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +186,7 @@ func TestWakeVerdictAsync(t *testing.T) {
 	go func() { _ = imp.Run(ctx) }()
 	waitReady(t, imp)
 
-	if err := nc.Publish("test.messages.in", []byte("hi")); err != nil {
+	if err := nc.Publish("messages.in", []byte("hi")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -212,14 +211,14 @@ func TestWakeVerdictAsync(t *testing.T) {
 	}
 }
 
-// waitReady polls Identity until SubjectPrefix is non-empty (Run has
-// installed the runtime). Helps avoid races between Run's startup and
-// publishes from the test.
+// waitReady polls until Imp.Ready() returns true (Run has installed
+// the runtime and registered subscriptions). Helps avoid races between
+// Run's startup and publishes from the test.
 func waitReady(t *testing.T, imp *harness.Imp) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if imp.Identity().SubjectPrefix != "" {
+		if imp.Ready() {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)

@@ -18,7 +18,6 @@ The declarative description of an imp. Constructed by the developer; consumed by
 | `Awareness` | `AwarenessFn` | yes | The cheap-interpretation callback (FR-009). |
 | `Reasoning` | `ReasoningFn` | yes | The expensive-deliberation callback (FR-016). |
 | `States` | `[]StateShape` | no | Zero or more local-state-shape declarations. |
-| `Actions` | `[]string` | no | The action subject whitelist (declared subjects, pre-resolution). |
 | `OnNote` | `func(Entity, any)` | no | Optional Note hook (FR-012). Nil = drop payload after counter increment. |
 
 **Validation rules** (FR-001, FR-002):
@@ -29,7 +28,6 @@ The declarative description of an imp. Constructed by the developer; consumed by
 - Every `StateShape.Name` must be unique within `States` (duplicate → typed `ErrDuplicateStateShape`).
 - Every `StateShape.Cap` must be `> 0`.
 - Every `Channel.Name` must be unique within `Channels`.
-- Duplicate entries in `Actions` are de-duplicated (whitelist semantics are set membership, edge case 13).
 
 Validation runs at `Run` and at `harness.NewImp(spec, ...)` if the latter exists; the error names the offending field (FR-002).
 
@@ -126,7 +124,8 @@ The typed surface available to the reasoning function.
 | Method | Return | Notes |
 |---|---|---|
 | `State(name string, entity Entity) (StateRef, error)` | same as awareness | Per-entity state access. |
-| `Publish(ctx context.Context, subject string, payload []byte) error` | error | Whitelist-checked publish (FR-027). `ErrWhitelistViolation{Subject}` returned for off-whitelist subjects; resolves declared subject through subject-resolver before reaching NATS. |
+| `Publish(ctx context.Context, subject string, payload []byte) error` | error | Publishes the payload on the declared subject verbatim. Subject permissioning is the substrate's concern (NATS ACLs); the framework performs no whitelist check. |
+| `Conn() *nats.Conn` | the underlying NATS connection | Escape hatch for generic NATS-based clients used from reasoning. Not available on `AwarenessContext`. |
 | `InFlight() int` | current in-flight reasoning count for this imp | Observability surface (FR-021b). |
 
 `ctx` cancellation is wired to harness shutdown — when the harness begins draining, the context passed to in-flight reasoning is cancelled, allowing cooperative cancellation.
@@ -155,7 +154,6 @@ The triple that identifies a running imp instance, queryable from the `Imp` hand
 |---|---|---|
 | `Name` | string | From `ImpSpec.Name`. |
 | `Version` | string | From `ImpSpec.Version`. |
-| `SubjectPrefix` | string | The fully-resolved prefix used for channel subscriptions and action publishes (mode-resolved, see Subject Resolution contract). |
 
 ---
 
@@ -192,7 +190,6 @@ Returned by `Imp.Metrics()`. All counters are non-resetting; snapshots capture p
 | `AwarenessPanics` | uint64 | counter — increments on FR-015 recover |
 | `ReasoningPanics` | uint64 | counter — increments on FR-021 recover |
 | `ReasoningErrors` | uint64 | counter — increments on FR-021 returned error |
-| `WhitelistViolations` | uint64 | counter — increments on FR-027 rejection |
 | `NotesDelivered` | uint64 | counter — increments per Note verdict (regardless of OnNote registration) |
 | `WakesDispatched` | uint64 | counter — increments per Wake verdict |
 | `IgnoredVerdicts` | uint64 | counter — increments per Ignore verdict |
@@ -220,12 +217,9 @@ Per-channel runtime state held by the harness.
 |---|---|---|
 | `WithDrainWindow(d time.Duration)` | `30 * time.Second` | Applied to graceful shutdown (FR-036). |
 | `WithLogger(h slog.Handler)` | `slog.NewTextHandler(io.Discard, …)` | Harness internal logging. |
-| `WithPlatformMode(importerAccountPK string)` | non-platform mode | Switches to platform-mode subject resolution (FR-031). |
-| `WithSubjectPrefix(prefix string)` | `""` | Required in non-platform mode (FR-030); also applied as the leading segment in platform mode. |
 
 **Validation at Run**:
-- Non-platform mode requires non-empty prefix.
-- Platform mode requires non-empty `importerAccountPK` (FR-033 — startup fails with a clear configuration error otherwise).
+- Non-empty prefix required (FR-033 — startup fails with `ErrConfigInvalid{Field: "prefix"}` otherwise).
 
 ---
 
@@ -259,8 +253,7 @@ Created → Starting → Running → Draining → Stopped
 | `ErrDuplicateStateShape` | construction | shape name |
 | `ErrUnknownStateShape` | runtime State call | shape name |
 | `ErrCapExceeded` | runtime State call when full | shape name + current count |
-| `ErrWhitelistViolation` | reasoning Publish | offending subject |
-| `ErrConfigInvalid` | startup | offending option (e.g., platform-mode without importer pk) |
+| `ErrConfigInvalid` | startup | offending option (e.g., empty subject prefix) |
 | `ErrStreamNotFound` | startup, stream channel | stream name |
 | `ErrConsumerIncompatible` | startup, stream channel | consumer name + diff summary |
 | `ErrSubscriptionFailed` | startup | subject + cause |
@@ -276,19 +269,16 @@ ImpSpec ──has──▶ ChannelSpec[]
               ──has──▶ AwarenessFn
               ──has──▶ ReasoningFn
               ──has──▶ StateShape[]
-              ──has──▶ Actions []string  (whitelist)
               ──has──▶ OnNote hook (optional)
 
 Imp (runtime) ──owns──▶ ChannelState[]            (one per ChannelSpec)
               ──owns──▶ StateRegistry             (one per StateShape, capped per shape)
-              ──owns──▶ SubjectResolver           (mode-aware)
-              ──owns──▶ Whitelist                 (set view of Actions)
               ──owns──▶ InFlightCounter
               ──owns──▶ Metrics counters
               ──holds──▶ *nats.Conn               (caller-supplied)
 
 AwarenessContext ──reads/writes──▶ StateRegistry
 ReasoningContext ──reads/writes──▶ StateRegistry
-                 ──checks──▶ Whitelist
-                 ──publishes via──▶ SubjectResolver + *nats.Conn
+                 ──publishes via──▶ *nats.Conn (verbatim subject)
+                 ──exposes──▶ Conn() *nats.Conn (escape hatch)
 ```

@@ -36,10 +36,9 @@ func runEmbeddedServer(t *testing.T) string {
 	return srv.ClientURL()
 }
 
-// TestSlogEventsEmitted asserts that the lifecycle, decode-failure, and
-// whitelist-violation events listed in contracts/observability.md "Logger"
-// actually arrive at the configured slog.Handler. Capturing slog output
-// in a buffer is the recommended sanity check from the task list (T087).
+// TestSlogEventsEmitted asserts that the lifecycle and decode-failure
+// events listed in contracts/observability.md "Logger" actually arrive
+// at the configured slog.Handler.
 func TestSlogEventsEmitted(t *testing.T) {
 	url := runEmbeddedServer(t)
 	nc, err := nats.Connect(url)
@@ -69,14 +68,11 @@ func TestSlogEventsEmitted(t *testing.T) {
 			return Wake(decoded, e)
 		},
 		Reasoning: func(ctx context.Context, _ any, _ Entity, r ReasoningContext) error {
-			// Trip a whitelist violation deliberately.
-			return r.Publish(ctx, "off.whitelist", []byte("x"))
+			return r.Publish(ctx, "actions.out", []byte("x"))
 		},
-		Actions: []string{"actions.out"},
 	}
 
 	imp, err := NewImp(spec, nc,
-		WithSubjectPrefix("test"),
 		WithLogger(handler),
 		WithDrainWindow(500*time.Millisecond),
 	)
@@ -88,14 +84,14 @@ func TestSlogEventsEmitted(t *testing.T) {
 	go func() { runErr <- imp.Run(ctx) }()
 
 	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && imp.Identity().SubjectPrefix == "" {
+	for time.Now().Before(deadline) && !imp.Ready() {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	if err := nc.Publish("test.messages.in", []byte("bad")); err != nil {
+	if err := nc.Publish("messages.in", []byte("bad")); err != nil {
 		t.Fatal(err)
 	}
-	if err := nc.Publish("test.messages.in", []byte("good")); err != nil {
+	if err := nc.Publish("messages.in", []byte("good")); err != nil {
 		t.Fatal(err)
 	}
 	if err := nc.Flush(); err != nil {
@@ -113,7 +109,6 @@ func TestSlogEventsEmitted(t *testing.T) {
 		"imp ready",
 		"channel ready",
 		"decode failure",
-		"whitelist violation",
 		"imp shutdown begin",
 		"imp shutdown end",
 	} {

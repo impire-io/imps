@@ -1,24 +1,38 @@
-# Compile-time assertion: awareness has no `Publish`
+# Compile-time assertions: the awareness energy gradient
 
-This package contains a single build-tagged file
-(`awareness_no_publish.go`) whose presence-of-build-failure is the
-assertion that satisfies SC-006.
+This package contains build-tagged files whose **build failure** is the
+assertion. Each file targets one method that exists on
+`ReasoningContext` but is intentionally absent on `AwarenessContext` —
+the compile error proves the structural energy gradient holds (SC-006,
+SC-104, FR-103b).
+
+| File | Build tag | Forbidden method |
+|---|---|---|
+| `awareness_no_publish.go` | `awareness_publish_must_fail` | `AwarenessContext.Publish` |
+| `awareness_no_requestmany.go` | `awareness_requestmany_must_fail` | `AwarenessContext.RequestMany` |
+| `awareness_no_conn.go` | `awareness_conn_must_fail` | `AwarenessContext.Conn` |
 
 ## How to verify
 
 ```sh
-# Expected: a compile error — that is the test passing.
-go vet -tags=awareness_publish_must_fail ./integration/compiletest/...
+# Each command MUST produce a compile error — that is the test passing.
+go vet -tags=awareness_publish_must_fail     ./integration/compiletest/...
+go vet -tags=awareness_requestmany_must_fail ./integration/compiletest/...
+go vet -tags=awareness_conn_must_fail        ./integration/compiletest/...
 ```
 
-If the command succeeds with no error, the energy-gradient guarantee
-documented in `specs/001-harness-core/contracts/public-api.md`
-("Compile-time guarantees" #1) has been broken — `AwarenessContext` has
-gained a `Publish` method that lets awareness call into the substrate.
+A successful (non-error) build under any of those tags means
+`AwarenessContext` has grown the corresponding method — a regression
+against `specs/002-capability-client/contracts/request-reply.md`
+"Compile-time guarantees" (or, for `Publish`,
+`specs/001-harness-core/contracts/public-api.md`).
 
-## Why a build tag
+The Makefile target `compile-deny` wraps the three commands and asserts
+non-zero exit for each.
 
-The default build excludes the file (the build tag is opaque to normal
-`go build` / `go test`). Only the verification command above activates the
-file, which is the right behavior — the rest of the test suite stays
-green because the assertion is "this *should not* compile".
+## Why build tags
+
+The default build excludes these files (the build tags are opaque to
+normal `go build` / `go test`). Only the verification commands above
+activate the files, which is the right behavior — the rest of the test
+suite stays green because the assertion is "this *should not* compile".

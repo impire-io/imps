@@ -5,6 +5,30 @@ description: "Task list for implementing Harness Core"
 
 # Tasks: Harness Core
 
+> **Note (2026-05-11)**: After this feature shipped, the constitution was
+> amended in two passes (v2.1.0 then v2.2.0) refining the "Imps see one
+> subject path" principle. In the same coordinated cleanup:
+>   - `WithPlatformMode(importerAccountPK)` (T015) and the platform-mode
+>     resolver branch (T018 / T070–T075) were removed.
+>   - The remaining `WithSubjectPrefix(prefix)` option and the
+>     single-form resolver were also removed; the framework now performs
+>     no subject transformation at all. A declared subject is the
+>     substrate subject verbatim.
+>   - `ImpIdentity.SubjectPrefix` was dropped; `Imp.Ready() bool` was
+>     added as the post-startup readiness signal that tests previously
+>     polled via the prefix.
+>   - The `ImpSpec.Actions` whitelist, `*ErrWhitelistViolation`, the
+>     `WhitelistViolations` metric, and the related runtime check were
+>     removed. Subject permissioning is the substrate's concern
+>     (NATS account ACLs).
+>   - `ReasoningContext.Conn() *nats.Conn` was added as the escape
+>     hatch for generic NATS-based clients used from reasoning.
+>     Awareness has no equivalent method — the absence is the
+>     structural enforcement of the energy gradient.
+> Cross-account access is the substrate's concern (NATS account
+> imports). The task entries below remain as the historical
+> implementation record.
+
 **Input**: Design documents from `/specs/001-harness-core/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
 

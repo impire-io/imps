@@ -92,23 +92,15 @@ func dispatchBenchSetup(b *testing.B, preheatInflight, entityCap int) (*Imp, *ch
 			}
 			return nil
 		},
-		Actions: []string{"bench.out"},
 	}
 
-	imp, err := NewImp(spec, nil, WithSubjectPrefix("bench"))
-	if err == nil {
-		// NewImp checks nc != nil; we only get here if that check is
-		// removed (it isn't). Fall through to the manual path below.
-		_ = imp
-	}
 	// Manual construction — bypass NewImp's nil-conn check so the bench
 	// can run without a real NATS connection.
-	imp = &Imp{spec: spec, opts: defaultRuntimeOptions()}
-	imp.opts.subjectPrefix = "bench"
+	imp := &Imp{spec: spec, opts: defaultRuntimeOptions()}
 	if err := imp.bootRuntime(); err != nil {
 		b.Fatalf("bootRuntime: %v", err)
 	}
-	ch := &channelState{spec: spec.Channels[0], resolvedSubject: "bench.bench"}
+	ch := &channelState{spec: spec.Channels[0], subject: "bench"}
 
 	// Pre-heat in-flight reasoning by directly launching the configured
 	// number of goroutines that block on `release`.

@@ -57,7 +57,7 @@ The full set of design decisions is in [`research.md`](./research.md); the runti
 | The energy gradient is structural | ✅ | `AwarenessContext` and `ReasoningContext` are distinct interfaces (R-7); `Publish` is defined only on `ReasoningContext` (FR-014). The compile-time invariant is asserted by a build-tagged file under `integration/compiletest/` (`contracts/public-api.md` §"Compile-time guarantees"). Whitelist enforcement runs at the publish call site before the substrate (FR-027). |
 | Capabilities are external; the harness is small | ✅ | This feature provides no capability implementations and no capability client. The reasoning context exposes only `State`, `Publish`, and `InFlight` (FR-017, observability contract). FR-NS-1 makes "no bounded-capability surface in awareness" explicit for v1. |
 | Coordination happens through the soulstream | N/A here | This feature does not introduce inter-imp coordination. Soulstream channels are explicitly deferred (FR-NS-2). The action-publish surface is generic NATS publish constrained by whitelist; soulstream conventions layer on later. |
-| Wire protocols are per-capability; deployment shape is uniform | N/A here | No capability is being designed in this feature. The platform-mode subject convention (FR-030/FR-031, `contracts/subject-resolution.md`) is the deployment-shape contract this feature commits to and will be reused by every capability service that follows. |
+| Wire protocols are per-capability; deployment shape is uniform | N/A here | No capability is being designed in this feature. The single-form subject convention (FR-030/FR-031, `contracts/subject-resolution.md`) is the deployment-shape contract this feature commits to. Per the constitution's "Imps see one subject path" principle (added in v2.1.0), the imp's view is uniform `<prefix>.<declared>`; cross-account routing is the substrate's concern. |
 
 ### Non-Negotiables
 
@@ -86,8 +86,7 @@ specs/001-harness-core/
 ├── contracts/
 │   ├── public-api.md                # Go-level developer-facing surface
 │   ├── observability.md             # Metrics, OnNote hook, slog events, what is NOT exposed
-│   ├── stream-channel.md            # JetStream startup, ack/NAK, durable compatibility
-│   └── subject-resolution.md        # Both deployment modes; symmetry guarantees
+│   └── stream-channel.md            # JetStream startup, ack/NAK, durable compatibility
 ├── checklists/
 │   └── requirements.md              # Spec-quality checklist (already passed)
 └── tasks.md                         # /speckit-tasks output — present from a prior run; this command does NOT modify it
@@ -108,7 +107,7 @@ harness/                             # public package — the developer-facing A
 ├── context.go                       # AwarenessContext + ReasoningContext interfaces (FR-014, FR-017, FR-029)
 ├── state.go                         # StateShape, StateRef interface, typed errors (FR-022..026)
 ├── imp.go                           # Imp handle, NewImp, Run, Shutdown, Identity, Metrics
-├── options.go                       # Option funcs: WithDrainWindow, WithLogger, WithSubjectPrefix, WithPlatformMode
+├── options.go                       # Option funcs: WithDrainWindow, WithLogger
 ├── errors.go                        # Typed errors (ErrSpecInvalid, ErrCapExceeded, ErrWhitelistViolation, ...)
 ├── message.go                       # Message struct (Subject, Reply, Headers, Data) — substrate-agnostic view
 └── doc.go                           # Package-level godoc
@@ -123,7 +122,7 @@ internal/
 ├── stream/
 │   └── consumer.go                  # JetStream bind/create + compatibility check (FR-005a..c, FR-008a, R-9, R-10)
 ├── subject/
-│   └── resolve.go                   # platform-mode and prefix subject resolution (FR-030..033, R-11)
+│   └── (no internal/subject subpackage; framework imposes no subject transformation, FR-030)
 ├── obs/
 │   └── metrics.go                   # atomic counters; Metrics() snapshot (FR-021b, observability contract)
 ├── ack/
@@ -159,13 +158,13 @@ specs/                               # already present (this feature)
 
 `/speckit-plan` stops at Phase 1. The task plan below is descriptive — to be expanded by `/speckit-tasks` into the per-task `tasks.md`. (A `tasks.md` from a prior run already exists in this directory; it is left untouched by this command.) The expected task strategy follows the user-story dependency order:
 
-1. **US-1 (P1) — End-to-end imp dispatch.** Public types (`ImpSpec`, `Verdict`, `AwarenessContext`, `ReasoningContext`, `Entity`, `StateRef`, `Source`/`SubjectSource`); `NewImp` validation; subject resolver (non-platform mode only); `internal/dispatch` core loop; `Imp.Run` / `Imp.Shutdown`; `integration/dispatch_test.go` golden path.
+1. **US-1 (P1) — End-to-end imp dispatch.** Public types (`ImpSpec`, `Verdict`, `AwarenessContext`, `ReasoningContext`, `Entity`, `StateRef`, `Source`/`SubjectSource`); `NewImp` validation; subject resolver; `internal/dispatch` core loop; `Imp.Run` / `Imp.Shutdown`; `integration/dispatch_test.go` golden path.
 2. **US-2 (P1) — Verdict semantics.** Fully implement `Ignore`/`Note`/`Wake` paths in dispatch; OnNote hook; reasoning goroutine launcher with WaitGroup + atomic in-flight counter.
 3. **US-3 (P1) — Structural boundary.** `integration/compiletest/awareness_publish_absence_test.go` (must fail to build if `Publish` ever appears on `AwarenessContext`); `internal/dispatch` whitelist check + `ErrWhitelistViolation`; `boundary_test.go` runtime assertions.
 4. **US-4 (P1) — Stream channels.** `StreamSource`, `ConsumerConfig`, `internal/stream/consumer.go` (bind/create/compat-check), JetStream startup error mapping, `internal/ack/ack.go`, `integration/stream_test.go`. Embedded server in `testutil/natstest` gains a JetStream toggle.
 5. **US-5 (P2) — Local memory.** `internal/state/store.go` per-shape `sync.Map` + atomic counter; `StateRef` interface (`Get`/`Set`/`Update`); cap-exceeded and unknown-shape errors; `state_test.go` including concurrent same-entity write.
 6. **US-6 (P2) — Reasoning concurrency.** Already enabled by US-2's launcher; this story is a test-only story plus the `InFlight()` accessor on `ReasoningContext` and the matching counter exposure (FR-021b).
-7. **US-7 (P2) — Both deployment modes.** `internal/subject/resolve.go` platform-mode branch and config validation (`ErrConfigInvalid` for missing `importer_account_pk`); `modes_test.go` driving the same imp through both modes.
+7. **US-7 (P2) — Subjects are literal.** Framework imposes no subject transformation (FR-030, constitution v2.2.0 "Imps see one subject path"); channels subscribe on the declared subject verbatim; `Publish` publishes on the declared subject verbatim.
 8. **US-8 (P3) — Clean lifecycle.** `internal/lifecycle/lifecycle.go` state machine (Created → Starting → Running → Draining → Stopped, plus terminal Failed); two-phase shutdown (R-14); ephemeral-consumer teardown; `lifecycle_test.go`.
 
 Cross-cutting tasks (run alongside the user stories, not blocking them):

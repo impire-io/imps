@@ -1,6 +1,11 @@
 package harness
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"time"
+)
 
 // ErrSpecInvalid is returned by NewImp when the supplied ImpSpec fails
 // validation. Field names the offending field; Reason describes why.
@@ -69,4 +74,33 @@ func (e *ErrSubscriptionFailed) Error() string {
 
 func (e *ErrSubscriptionFailed) Unwrap() error {
 	return e.Cause
+}
+
+// ErrNoResponders is returned by Request and (in the publish-refusal
+// path) RequestMany when the substrate reports nats.ErrNoResponders for
+// the given subject. The "no responders, but window elapsed" outcome of
+// RequestMany returns an empty slice instead, not this error.
+type ErrNoResponders struct {
+	Subject string
+}
+
+func (e *ErrNoResponders) Error() string {
+	return "harness: no responders for subject " + strconv.Quote(e.Subject)
+}
+
+// ErrRequestTimeout is returned by Request when the effective deadline
+// elapsed before a reply arrived. It unwraps to context.DeadlineExceeded
+// so errors.Is(err, context.DeadlineExceeded) holds.
+type ErrRequestTimeout struct {
+	Subject string
+	Timeout time.Duration
+}
+
+func (e *ErrRequestTimeout) Error() string {
+	return "harness: request timeout: subject " + strconv.Quote(e.Subject) +
+		" exceeded " + e.Timeout.String()
+}
+
+func (e *ErrRequestTimeout) Unwrap() error {
+	return context.DeadlineExceeded
 }

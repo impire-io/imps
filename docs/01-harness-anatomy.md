@@ -132,7 +132,7 @@ Action is the harness's outbound surface. It's how the imp affects the world.
 
 An imp has three kinds of action:
 
-- **Channel publishes** — publishing on the action subjects declared in the imp's spec. The spec's `publishes` list is the whitelist; attempts to publish elsewhere are rejected at the harness.
+- **Channel publishes** — publishing on NATS subjects via the reasoning context. Subject permissioning is a substrate concern — operators constrain what an imp can publish on via NATS account ACLs on the imp's connection, not via a framework-side whitelist.
 - **Soulstream operations** — opening topics, posting turns, mentioning. These flow through the soulstream's subject conventions.
 - **Capability calls with side effects** — tool execution, delegation. These go through the reasoning context's capability surface.
 
@@ -221,7 +221,7 @@ A record of choices and their rationale, for future reference:
 - **Awareness can call bounded capabilities.** Earlier drafts had awareness as fully-local. That broke as soon as classification needed embeddings. Bounded-by-construction with metadata-driven enforcement is what landed.
 - **One connection per imp, not two.** Considered separate awareness and reasoning NATS connections with different subject permissions. Rejected as overengineering — type-level discipline plus subject permissions on a single connection is enough.
 - **No dedicated capability-discovery endpoint.** Considered but rejected: `$SRV.INFO` plus endpoint metadata already carry the contract. Adding a parallel endpoint duplicates state and creates drift potential.
-- **Subject taxonomy is per-capability, not framework-wide.** Each capability designs its own post-prefix subjects. The framework standardizes the prefix (`<prefix>.` or `<prefix>.<account-pub-key>.`) and the deployment pattern.
+- **Subject taxonomy is per-capability, not framework-wide.** Each capability designs its own subjects. The framework does not impose a prefix or platform-mode segment — the imp's declared subjects are the substrate subjects verbatim (constitution "Imps see one subject path"). Cross-account routing and tenant scoping are configured at the substrate via NATS account imports.
 - **Sleep is the common case, hard restart is the exception.** Memory and persistence are designed around snapshot-based sleep first; replay-from-backend is the cold-start path, not the hot path. The framework specifies the sleep/wake contract; the isolation mechanism that implements it (microVMs, containers, processes, simulation) is an infrastructure choice.
 - **The wake-hook is mandatory in design even if optional in implementation.** Time-skip after sleep is a real bug class; designing it in early is cheaper than retrofitting.
 
