@@ -4,15 +4,15 @@
 
 ---
 
-A capability service is a NATS micro service that handles a specific kind of work for imps — inference, knowledge, tool execution, or anything else the harness needs to reach for during reasoning. The framework defines no central registry of capabilities; the live capability surface of a deployment is whatever NATS micro services are reachable at a given moment.
+A capability service is a NATS micro service that handles a specific kind of work for imps — inference, knowledge, tool execution, or anything else an imp reaches for during reasoning. The framework defines no central registry of capabilities, and the framework does no discovery on the imp's behalf. The live capability surface of a deployment is whatever NATS micro services are reachable at a given moment; what's on the other end of a subject is the operator's design.
 
-What's standardized is the *shape*: how a capability service registers, how imps discover it, where it sits in the subject hierarchy, what metadata it carries, and what operational invariants it satisfies. What's *not* standardized is the wire protocol — endpoints, request/response shapes, error semantics. Those are each capability's own design, recorded in its own spec.
+What's standardized is the *shape*: how a capability service registers, where it sits in the subject hierarchy, what metadata it exposes for operators and tooling, and what operational invariants it satisfies. What's *not* standardized is the wire protocol — endpoints, request/response shapes, error semantics. Those are each capability's own design, recorded in its own spec.
 
 This document is the deployment shape. The inference service spec is the canonical worked example.
 
 ## NATS micro registration
 
-Every capability service registers as a NATS micro service. The standard `$SRV.PING`, `$SRV.INFO`, and `$SRV.STATS` interfaces are how clients discover, health-check, and observe the service. Custom discovery mechanisms are not allowed; capability services that want to be reachable use NATS micro and only NATS micro.
+Every capability service registers as a NATS micro service. The standard `$SRV.PING`, `$SRV.INFO`, and `$SRV.STATS` interfaces are how operators discover, health-check, and observe the service. Custom discovery mechanisms are not allowed; capability services that want to be reachable use NATS micro and only NATS micro.
 
 Each running instance of a capability service is one NATS micro service registration. Multiple instances with the same service name form a queue group — requests on the service's subjects load-balance across them. Multiple instances with different service names coexist as heterogeneous siblings, each handling its own subset of work.
 
@@ -22,20 +22,19 @@ The service `name` and `version` are configuration. The instance ID is assigned 
 
 A capability service registers one or more endpoints. Each endpoint is bound to a specific NATS subject and handles requests on that subject. The subject is the contract — imps address work by publishing on subjects, not by looking up service names.
 
-Per-endpoint metadata in `$SRV.INFO` carries everything an imp needs to know to use the endpoint:
+Per-endpoint metadata in `$SRV.INFO` is useful for operators and tooling:
 
 - The subject the endpoint handles.
-- A request schema and a response schema.
-- A **bounded** flag, indicating whether the endpoint guarantees a bounded response envelope (single round-trip, deterministic latency budget, no fan-out, no side effects beyond the call). Bounded endpoints are awareness-callable; unbounded endpoints are reasoning-only.
+- A request schema and a response schema (for tooling, for client-library generation, for human readers).
 - Any capability-specific metadata the endpoint wants to expose.
 
 Service-level metadata in `$SRV.INFO` carries:
 
-- Descriptive capability labels (e.g. `["vision", "reasoning"]` for inference) — these are for human and operator-facing filtering, not routing.
+- Descriptive capability labels (e.g. `["vision", "reasoning"]` for inference) — for human and operator-facing filtering, not routing.
 - Service-wide configuration hints relevant to consumers (deployment mode, supported variants, etc.).
 - Anything else that applies to the service as a whole rather than to individual endpoints.
 
-Imps discover by querying `$SRV.INFO`, walking endpoint lists across replies, and checking declared subjects against their spec dependencies. The harness does this once at startup and exposes the resolved capability surface to the imp; imps do not query at request time.
+**The imp framework does not consume `$SRV.INFO`.** Imps address subjects directly; whatever endpoint metadata a capability service exposes is for operator dashboards, capability-specific client libraries, and discovery tools — not for the framework. An imp can use `Conn()` to query `$SRV.INFO` itself if its own logic needs to, but the framework does no startup discovery and maintains no resolved capability surface.
 
 ## Subject convention
 
@@ -57,17 +56,17 @@ Capability service instances are stateless with respect to per-request data. No 
 
 Audit/log records emitted per request are explicitly excluded from this constraint, but they must not contain content beyond what's needed for cost attribution and lifecycle reconstruction.
 
-This invariant is what lets capability services scale horizontally without coordination, restart freely without state migration, and be terminated and replaced at any time. The next `$SRV.INFO` request reflects the live cluster without heartbeats, registry writes, or client cache invalidation.
+This invariant is what lets capability services scale horizontally without coordination, restart freely without state migration, and be terminated and replaced at any time. The next `$SRV.INFO` query against the cluster reflects the live set without heartbeats, registry writes, or client cache invalidation.
 
 ## Configuration determines what an instance offers
 
 A capability service instance is configured at startup with what it serves. Configuration determines:
 
 - Which endpoints are registered (and therefore which subjects the instance handles).
-- What metadata each endpoint declares — schemas, boundedness, capability-specific hints.
+- What metadata each endpoint declares — schemas, capability-specific hints.
 - What scope or backing the instance uses (a knowledge instance configured for tenant-wide episodic memory backed by Elasticsearch; a different instance configured for imp-class-scoped procedural memory backed by a vector store).
 
-Heterogeneity at the cluster level is achieved by running different instances with different configurations, not by multiplexing inside an instance. Two instances of the same capability service can offer non-overlapping endpoint sets, reflect different scopes, or use different backing stores. The discovery surface tells imps what each one does.
+Heterogeneity at the cluster level is achieved by running different instances with different configurations, not by multiplexing inside an instance. Two instances of the same capability service can offer non-overlapping endpoint sets, reflect different scopes, or use different backing stores.
 
 A consequence: scope is a deployment concern, not a wire protocol concern. The protocol does not need a "scope" parameter on every request; the subject prefix and the configured instance behind it carry the scoping naturally.
 
@@ -77,13 +76,19 @@ Multiple instances configured identically register on the same service name and 
 
 For capabilities where state must be partitioned (a knowledge service backed by a sharded store, for example), the partitioning lives inside the capability implementation and is invisible to the wire protocol. The capability service spec defines whatever consistency guarantees apply; the framework does not impose its own.
 
-## Discovery is at the door, not on every call
+## How imps actually call
 
-The harness queries `$SRV.INFO` at imp startup and aggregates declared endpoints into the imp's resolved capability surface. Required dependencies that aren't satisfied cause the imp to fail to start with a clear error. Optional dependencies that aren't satisfied are recorded as flags the imp can check at runtime if it adapts behavior.
+An imp's code names the subject directly. If a knowledge service registers `knowledge.episode.recall`, the imp's reasoning function calls:
 
-After startup, the imp addresses capabilities by subject directly. There is no per-request discovery, no name lookup, no client-side service selection. If a service goes away while an imp is running, calls to its subjects time out — the imp handles that as a degradation, not a discovery refresh.
+```go
+reply, err := r.Request(ctx, "knowledge.episode.recall", payload)
+```
 
-This trades adaptability for simplicity, deliberately. An imp that wants to handle "is this capability available right now" cases asks the harness; the harness can re-query `$SRV.INFO` if the imp explicitly requests it. The default is "discovery is verification at startup, addressing is by subject thereafter."
+No declaration on the imp's spec, no startup verification, no `HasCapability` check, no resolved surface. If the service isn't running, the call returns `*ErrNoResponders` immediately; if it's slow, it returns `*ErrRequestTimeout`. The imp's code decides what to do with the failure.
+
+This trades adaptability for simplicity, deliberately. An imp that wants to handle "is this capability available right now" cases can pull `r.Conn()` and query `$SRV.INFO` itself with the same machinery any other NATS-aware tool uses — the framework offers no built-in equivalent and won't grow one.
+
+The boundedness gate is structural, on the imp's side. Awareness has `Request` only; `RequestMany`, `Publish`, and `Conn` are absent from its context. Reasoning has the full surface. The framework does not read endpoint metadata to decide what awareness can call — call-shape is the criterion.
 
 ## Audit and statistics
 
@@ -102,7 +107,7 @@ Once an imp depends on a subject, the subject's wire protocol is a public API. C
 Two patterns the framework recommends but does not mandate:
 
 - **Token-position versioning** — include a version segment in the subject (`knowledge.v1.episode.recall`). New major versions register on parallel subjects; old versions stay supported until consumers migrate.
-- **Schema versioning in metadata** — the endpoint's request and response schemas in `$SRV.INFO` carry a version. Imps check at startup that the schema version matches what their spec was written against.
+- **Schema versioning in metadata** — the endpoint's request and response schemas in `$SRV.INFO` carry a version. Tooling (capability-specific client libraries, operator dashboards) can check; the imp framework does not.
 
 Either is fine. The principle is that subjects are the contract and the contract is versioned; how the versioning is expressed is per-capability.
 
@@ -114,7 +119,7 @@ Deliberately left to each capability:
 - Request and response schemas.
 - Error categories and their meaning.
 - Streaming versus single-shot wire patterns. (Inference uses streaming-with-empty-terminator; knowledge will likely use single-shot request/reply; tools may use either.)
-- Boundedness criteria — the capability decides which of its endpoints are bounded and what the bound actually means quantitatively.
+- Boundedness criteria — the capability decides what bound it claims to honor, but the imp framework does not consume that claim; the framework's structural boundedness is on the imp's side, by call shape.
 - Configuration schema beyond what's needed for the deployment shape.
 - Backing store choices, internal architecture, scaling strategies.
 
@@ -127,10 +132,9 @@ The inference service spec ([reference]) implements this pattern:
 - Registers as a NATS micro service with a configurable `name`.
 - Two endpoints (`prompt`, `embed`), each on its own subject.
 - Service-level metadata declares capability labels (`vision`, `reasoning`, etc.) for descriptive filtering.
-- Endpoint-level metadata declares request/response schemas. Whether `embed` is flagged bounded for awareness use is the inference spec's call; given its single-shot, deterministic nature, it makes sense.
+- Endpoint-level metadata declares request/response schemas.
 - Stateless per request; no prompt or response content persists on the instance.
 - Heterogeneity is one model per instance; running multiple instances with different models gives the cluster heterogeneous capabilities.
-- Subject prefix convention follows the platform/non-platform split.
 - HA via queue groups with the same service name.
 
 Knowledge will follow the same shape with different endpoints, different schemas, different scoping configuration. So will future capabilities.
@@ -138,8 +142,8 @@ Knowledge will follow the same shape with different endpoints, different schemas
 ## Decisions and tradeoffs
 
 - **No generic capability protocol.** Each capability defines its own wire protocol. Considered and rejected: a uniform request/response schema. The result would have been a lowest-common-denominator surface that fits no capability well.
-- **Endpoint metadata, not service-level metadata, carries the per-subject contract.** The subject lives on the endpoint already; duplicating it elsewhere creates drift. Boundedness, schemas, and per-subject hints all live with the endpoint.
-- **Discovery at startup, addressing by subject afterward.** Trades adaptability for simplicity. Imps that need adaptation can ask the harness to re-query, but it's an exception path.
+- **The framework holds no capability concept.** No declaration on the imp's spec, no startup discovery, no resolved surface, no `HasCapability` check, no metadata-driven boundedness gate. Whatever is on the other end of a subject is the operator's design. Considered and rejected: required/optional capability dependencies resolved at startup via `$SRV.INFO`. That model required the framework to model capabilities and maintain bookkeeping that operator tooling already handles. Call-shape boundedness on the imp's side gets the same energy-gradient guarantee with no framework-side state.
+- **Endpoint metadata is for operators and tooling, not for the framework.** The subject lives on the endpoint already; schemas and descriptive metadata help humans, dashboards, and capability-specific client libraries. The imp framework does not read it.
 - **Scope is configuration, not a wire-protocol parameter.** Pushes scoping into deployment topology. Cleaner protocols, no scope-validation complexity, natural multi-tenancy via NATS account scoping.
 - **Statelessness per request is invariant.** Coordination state (in-flight tracking, replay buffers) lives on callers, not on capability instances. This is what makes free restart and horizontal scaling possible.
 - **Versioning is the capability's responsibility, not the framework's.** The framework doesn't impose a version scheme because different capabilities will want different ones; documenting both common patterns suffices.
