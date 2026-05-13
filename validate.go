@@ -13,8 +13,8 @@ func validateSpec(spec ImpSpec) error {
 	if spec.Awareness == nil {
 		return &ErrSpecInvalid{Field: "Awareness", Reason: "nil"}
 	}
-	if spec.Reasoning == nil {
-		return &ErrSpecInvalid{Field: "Reasoning", Reason: "nil"}
+	if spec.Thinking == nil {
+		return &ErrSpecInvalid{Field: "Thinking", Reason: "nil"}
 	}
 	if err := validateStates(spec.States); err != nil {
 		return err

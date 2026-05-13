@@ -41,7 +41,7 @@ func memorySpec(cap int, awareness imps.AwarenessFn, onNote func(imps.Entity, an
 			},
 		}},
 		Awareness: awareness,
-		Reasoning: func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil },
+		Thinking:  func(_ context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error { return nil },
 		OnNote:    onNote,
 	}
 }

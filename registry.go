@@ -15,7 +15,7 @@ type shape struct {
 }
 
 // slot is the per-entity record. A per-slot mutex serializes Update so two
-// concurrent awareness/reasoning calls for the same entity each see a
+// concurrent awareness/thinking calls for the same entity each see a
 // consistent snapshot.
 type slot struct {
 	mu  sync.Mutex

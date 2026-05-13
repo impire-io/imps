@@ -13,7 +13,7 @@ import (
 )
 
 // startBareImp starts an imp without injecting a default channel. Tests
-// that drive Request/RequestMany from awareness or reasoning need full
+// that drive Request/RequestMany from awareness or thinking need full
 // control over the imp's ChannelSpec.
 func startBareImp(t *testing.T, spec imps.ImpSpec, opts ...imps.Option) (*imps.Imp, *nats.Conn, func()) {
 	t.Helper()
@@ -52,12 +52,12 @@ func startBareImp(t *testing.T, spec imps.ImpSpec, opts ...imps.Option) (*imps.I
 	return imp, nc, cleanup
 }
 
-// reasoningRequestSpec builds an imp whose reasoning calls r.Request on
+// thinkingRequestSpec builds an imp whose thinking calls r.Request on
 // the given subject with the decoded payload and publishes the reply on
 // "actions.out". The supplied reqOpts are forwarded to the Request call.
-func reasoningRequestSpec(subject string, reqOpts ...imps.RequestOption) imps.ImpSpec {
+func thinkingRequestSpec(subject string, reqOpts ...imps.RequestOption) imps.ImpSpec {
 	return imps.ImpSpec{
-		Name:    "request-reasoning",
+		Name:    "request-thinking",
 		Version: "0.1.0",
 		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
@@ -72,7 +72,7 @@ func reasoningRequestSpec(subject string, reqOpts ...imps.RequestOption) imps.Im
 		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
+		Thinking: func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
 			reply, err := r.Request(ctx, subject, reason.([]byte), reqOpts...)
 			if err != nil {
 				return r.Publish(ctx, "actions.err", []byte(err.Error()))
@@ -82,9 +82,9 @@ func reasoningRequestSpec(subject string, reqOpts ...imps.RequestOption) imps.Im
 	}
 }
 
-// TestRequest_Reasoning_HappyPath — US-1 acceptance scenarios 1 and 2.
-func TestRequest_Reasoning_HappyPath(t *testing.T) {
-	imp, nc, cleanup := startBareImp(t, reasoningRequestSpec("knowledge.recall"))
+// TestRequest_Thinking_HappyPath — US-1 acceptance scenarios 1 and 2.
+func TestRequest_Thinking_HappyPath(t *testing.T) {
+	imp, nc, cleanup := startBareImp(t, thinkingRequestSpec("knowledge.recall"))
 	defer cleanup()
 
 	if _, err := nc.Subscribe("knowledge.recall", func(m *nats.Msg) {
@@ -114,7 +114,7 @@ func TestRequest_Reasoning_HappyPath(t *testing.T) {
 	}
 
 	// Allow the metrics increment to settle (RequestCalls is incremented
-	// inside requestSingle before returning; the reasoning goroutine has
+	// inside requestSingle before returning; the thinking goroutine has
 	// already finished by the time the actions.out callback fires).
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
@@ -128,12 +128,12 @@ func TestRequest_Reasoning_HappyPath(t *testing.T) {
 	}
 }
 
-// TestRequest_Reasoning_PerCallTimeoutHonored — US-1 AS-2: the call respects
+// TestRequest_Thinking_PerCallTimeoutHonored — US-1 AS-2: the call respects
 // WithRequestTimeout when supplied. (Counterpart timeout-failure assertions
 // live in TestRequest_ErrRequestTimeout under US-5 / US-6.)
-func TestRequest_Reasoning_PerCallTimeoutHonored(t *testing.T) {
+func TestRequest_Thinking_PerCallTimeoutHonored(t *testing.T) {
 	imp, nc, cleanup := startBareImp(t,
-		reasoningRequestSpec("knowledge.recall", imps.WithRequestTimeout(50*time.Millisecond)),
+		thinkingRequestSpec("knowledge.recall", imps.WithRequestTimeout(50*time.Millisecond)),
 	)
 	defer cleanup()
 
@@ -227,7 +227,7 @@ func awarenessRequestSpec(
 			}
 			return imps.Think(reply, e)
 		},
-		Reasoning: func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
+		Thinking: func(_ context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error {
 			return nil
 		},
 		OnNote: func(_ imps.Entity, payload any) {
@@ -334,14 +334,14 @@ func TestRequest_Awareness_TimeoutInVerdict(t *testing.T) {
 	}
 }
 
-// TestSubjectsAreLiteral_Request — US-7 AS-1 for Request (both reasoning
+// TestSubjectsAreLiteral_Request — US-7 AS-1 for Request (both thinking
 // and awareness paths) plus the verbatim Subject field on
 // *ErrNoResponders.
 func TestSubjectsAreLiteral_Request(t *testing.T) {
-	// Reasoning path: capture msg.Subject on a literal-subject responder
+	// Thinking path: capture msg.Subject on a literal-subject responder
 	// and assert it is byte-for-byte the declared subject.
-	t.Run("reasoning_subject_byte_for_byte", func(t *testing.T) {
-		_, nc, cleanup := startBareImp(t, reasoningRequestSpec("knowledge.recall"))
+	t.Run("thinking_subject_byte_for_byte", func(t *testing.T) {
+		_, nc, cleanup := startBareImp(t, thinkingRequestSpec("knowledge.recall"))
 		defer cleanup()
 
 		seen := make(chan string, 1)
@@ -371,7 +371,7 @@ func TestSubjectsAreLiteral_Request(t *testing.T) {
 	t.Run("err_no_responders_subject_verbatim", func(t *testing.T) {
 		replies := make(chan []byte, 1)
 		errs := make(chan error, 1)
-		_, nc, cleanup := startBareImp(t, reasoningCallSpec(
+		_, nc, cleanup := startBareImp(t, thinkingCallSpec(
 			"knowledge.recall", replies, errs, false,
 			imps.WithRequestTimeout(500*time.Millisecond),
 		))

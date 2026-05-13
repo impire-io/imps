@@ -13,7 +13,7 @@ import (
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
-func lifecycleSpec(channels []imps.ChannelSpec, reasoning imps.ReasoningFn) imps.ImpSpec {
+func lifecycleSpec(channels []imps.ChannelSpec, thinking imps.ThinkingFn) imps.ImpSpec {
 	return imps.ImpSpec{
 		Name:     "lifecycle",
 		Version:  "1.2.3",
@@ -21,7 +21,7 @@ func lifecycleSpec(channels []imps.ChannelSpec, reasoning imps.ReasoningFn) imps
 		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Think(decoded, e)
 		},
-		Reasoning: reasoning,
+		Thinking: thinking,
 	}
 }
 
@@ -45,7 +45,7 @@ func TestStartupRegistersSubscriptions(t *testing.T) {
 		subjectChannel("a", "messages.a"),
 		subjectChannel("b", "messages.b"),
 	}
-	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil })
+	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error { return nil })
 
 	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
@@ -102,7 +102,7 @@ func TestStartupFailureNoLeaks(t *testing.T) {
 			ExtractEntity: func(any) (imps.Entity, error) { return "x", nil },
 		},
 	}
-	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil })
+	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error { return nil })
 
 	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
@@ -151,14 +151,14 @@ func TestShutdownDrainBoundedReturn(t *testing.T) {
 	const drain = 250 * time.Millisecond
 	subsBefore := nc.NumSubscriptions()
 
-	reasoningStart := make(chan struct{}, 4)
-	reasoning := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
-		reasoningStart <- struct{}{}
+	thinkingStart := make(chan struct{}, 4)
+	thinking := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error {
+		thinkingStart <- struct{}{}
 		<-ctx.Done()
 		return nil
 	}
 
-	spec := lifecycleSpec([]imps.ChannelSpec{subjectChannel("inbound", "messages.in")}, reasoning)
+	spec := lifecycleSpec([]imps.ChannelSpec{subjectChannel("inbound", "messages.in")}, thinking)
 	imp, err := imps.NewImp(spec, nc, imps.WithDrainWindow(drain))
 	if err != nil {
 		t.Fatal(err)
@@ -176,9 +176,9 @@ func TestShutdownDrainBoundedReturn(t *testing.T) {
 	}
 	for i := 0; i < 2; i++ {
 		select {
-		case <-reasoningStart:
+		case <-thinkingStart:
 		case <-time.After(2 * time.Second):
-			t.Fatalf("reasoning %d never started", i+1)
+			t.Fatalf("thinking %d never started", i+1)
 		}
 	}
 
@@ -206,7 +206,7 @@ func TestIdentityAcrossStates(t *testing.T) {
 	t.Cleanup(func() { nc.Close() })
 
 	spec := lifecycleSpec([]imps.ChannelSpec{subjectChannel("inbound", "messages.in")},
-		func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil })
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error { return nil })
 
 	imp, err := imps.NewImp(spec, nc)
 	if err != nil {

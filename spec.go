@@ -3,7 +3,7 @@ package imps
 import "context"
 
 // Entity identifies the subject (in the linguistic sense) the imp's
-// awareness/reasoning operate on for a given message. The empty Entity ("")
+// awareness/thinking operate on for a given message. The empty Entity ("")
 // is invalid; entity extractors that return "" cause the message to be
 // recorded as an extraction failure and skipped.
 type Entity string
@@ -18,15 +18,15 @@ type AwarenessFn func(
 	awareness AwarenessContext,
 ) Verdict
 
-// ReasoningFn is the expensive-deliberation callback. It is invoked on a
+// ThinkingFn is the expensive-deliberation callback. It is invoked on a
 // fresh goroutine per Think verdict. The ctx passed is the harness shutdown
-// context — cancelled when shutdown begins so reasoning can cooperatively
-// exit. A returned error is recorded against ReasoningErrors.
-type ReasoningFn func(
+// context — cancelled when shutdown begins so thinking can cooperatively
+// exit. A returned error is recorded against ThinkingErrors.
+type ThinkingFn func(
 	ctx context.Context,
 	reason any,
 	entity Entity,
-	reasoning ReasoningContext,
+	thinking ThinkingContext,
 ) error
 
 // StateShape declares one named per-entity state slot. Factory MUST be
@@ -51,7 +51,7 @@ type ImpSpec struct {
 	Version   string
 	Channels  []ChannelSpec
 	Awareness AwarenessFn
-	Reasoning ReasoningFn
+	Thinking  ThinkingFn
 	States    []StateShape
 	OnNote    func(entity Entity, payload any)
 }
@@ -63,22 +63,22 @@ type ImpIdentity struct {
 }
 
 // Metrics is a non-resetting snapshot of harness counters. All values are
-// monotonic across the lifetime of the imp except InflightReasoning, which
+// monotonic across the lifetime of the imp except InflightThinking, which
 // is a gauge.
 type Metrics struct {
-	InflightReasoning  int64
+	InflightThinking   int64
 	DecodeFailures     uint64
 	ExtractionFailures uint64
 	AwarenessPanics    uint64
-	ReasoningPanics    uint64
-	ReasoningErrors    uint64
+	ThinkingPanics     uint64
+	ThinkingErrors     uint64
 	NotesDelivered     uint64
 	ThinksDispatched   uint64
 	IgnoredVerdicts    uint64
 	NakTotal           uint64
 
 	// RequestCalls is the total number of Request invocations (success +
-	// failure) across awareness and reasoning. Calls made via Conn() bypass
+	// failure) across awareness and thinking. Calls made via Conn() bypass
 	// this counter.
 	RequestCalls uint64
 	// RequestManyCalls is the total number of RequestMany invocations.

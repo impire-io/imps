@@ -13,7 +13,7 @@ type StateRef interface {
 }
 
 // ErrUnknownStateShape is returned by AwarenessContext.State /
-// ReasoningContext.State when the shape name is not declared on the
+// ThinkingContext.State when the shape name is not declared on the
 // ImpSpec.
 type ErrUnknownStateShape struct {
 	Shape string
@@ -24,7 +24,7 @@ func (e *ErrUnknownStateShape) Error() string {
 }
 
 // ErrCapExceeded is returned by AwarenessContext.State /
-// ReasoningContext.State when the requested entity is new and the shape's
+// ThinkingContext.State when the requested entity is new and the shape's
 // declared cap has been reached. No silent eviction occurs; reads/writes
 // on existing slots continue to succeed.
 type ErrCapExceeded struct {

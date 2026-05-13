@@ -7,11 +7,11 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-// reasoningCtx is the concrete ReasoningContext. Publish, Conn, State,
+// thinkingCtx is the concrete ThinkingContext. Publish, Conn, State,
 // InFlight, Request, and RequestMany are all thin shims over the
 // harness's runtime state. Subject permissioning is the substrate's
 // concern (NATS ACLs); the harness performs no framework-side whitelist.
-type reasoningCtx struct {
+type thinkingCtx struct {
 	registry                 *registry
 	conn                     *nats.Conn
 	metrics                  *metrics
@@ -20,23 +20,23 @@ type reasoningCtx struct {
 	defaultRequestManyWindow time.Duration
 }
 
-func (r *reasoningCtx) State(name string, entity Entity) (StateRef, error) {
+func (r *thinkingCtx) State(name string, entity Entity) (StateRef, error) {
 	return r.registry.ref(name, entity)
 }
 
-func (r *reasoningCtx) Publish(_ context.Context, subject string, payload []byte) error {
+func (r *thinkingCtx) Publish(_ context.Context, subject string, payload []byte) error {
 	return r.conn.Publish(subject, payload)
 }
 
-func (r *reasoningCtx) InFlight() int {
-	return int(r.metrics.InflightReasoning.Load())
+func (r *thinkingCtx) InFlight() int {
+	return int(r.metrics.InflightThinking.Load())
 }
 
-func (r *reasoningCtx) Conn() *nats.Conn {
+func (r *thinkingCtx) Conn() *nats.Conn {
 	return r.conn
 }
 
-func (r *reasoningCtx) Request(
+func (r *thinkingCtx) Request(
 	ctx context.Context,
 	subject string,
 	payload []byte,
@@ -45,7 +45,7 @@ func (r *reasoningCtx) Request(
 	return requestSingle(ctx, r.conn, r.metrics, r.logger, r.defaultRequestTimeout, subject, payload, opts)
 }
 
-func (r *reasoningCtx) RequestMany(
+func (r *thinkingCtx) RequestMany(
 	ctx context.Context,
 	subject string,
 	payload []byte,

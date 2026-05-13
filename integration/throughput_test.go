@@ -14,7 +14,7 @@ import (
 )
 
 // TestSustainedAwarenessUnderLoad drives sustained channel publishes for
-// thousands of distinct entities while reasoning remains in flight. The
+// thousands of distinct entities while thinking remains in flight. The
 // assertion (SC-011) is that awareness keeps dispatching — measured here
 // as the per-message metric counters keeping pace with the publish count.
 func TestSustainedAwarenessUnderLoad(t *testing.T) {
@@ -54,8 +54,8 @@ func TestSustainedAwarenessUnderLoad(t *testing.T) {
 			awarenessSeen.Add(1)
 			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
-			// Hold every reasoning invocation so it stays in flight while
+		Thinking: func(ctx context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error {
+			// Hold every thinking invocation so it stays in flight while
 			// we drive more awareness through the dispatcher.
 			select {
 			case <-hold:
@@ -99,7 +99,7 @@ func TestSustainedAwarenessUnderLoad(t *testing.T) {
 	if seen := awarenessSeen.Load(); seen < expected {
 		t.Fatalf("awareness backpressured under load: saw %d / %d (metrics=%+v)", seen, expected, imp.Metrics())
 	}
-	if v := imp.Metrics().InflightReasoning; v < int64(entities) {
-		t.Fatalf("expected reasoning to stay in flight (>= %d), got %d", entities, v)
+	if v := imp.Metrics().InflightThinking; v < int64(entities) {
+		t.Fatalf("expected thinking to stay in flight (>= %d), got %d", entities, v)
 	}
 }

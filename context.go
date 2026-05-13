@@ -22,23 +22,23 @@ type AwarenessContext interface {
 	Request(ctx context.Context, subject string, payload []byte, opts ...RequestOption) ([]byte, error)
 }
 
-// ReasoningContext is the typed surface available to the reasoning
+// ThinkingContext is the typed surface available to the thinking
 // function. Publish is a thin convenience over the NATS connection;
-// InFlight returns the current in-flight reasoning count; Conn returns
+// InFlight returns the current in-flight thinking count; Conn returns
 // the raw *nats.Conn the harness was constructed with, so generic
 // NATS-based clients (e.g., a downstream inference client) can be used
-// from reasoning without further framework ceremony. Request and
+// from thinking without further framework ceremony. Request and
 // RequestMany add bounded and fan-out NATS round-trips respectively.
 //
 // Subject permissioning is the substrate's concern (NATS account ACLs
 // on the connection). The harness performs no whitelist check.
-type ReasoningContext interface {
+type ThinkingContext interface {
 	State(name string, entity Entity) (StateRef, error)
 	Publish(ctx context.Context, subject string, payload []byte) error
 	InFlight() int
 
 	// Conn returns the raw NATS connection the imp was constructed with.
-	// Available on ReasoningContext only — awareness has no equivalent
+	// Available on ThinkingContext only — awareness has no equivalent
 	// method (structural enforcement of the energy gradient). Use this
 	// when a downstream NATS-based client takes a *nats.Conn directly.
 	Conn() *nats.Conn

@@ -9,8 +9,8 @@ import (
 // caller's job (subject channels have no ack; stream channels ack/NAK
 // outside this function based on the dispatchOutcome we return).
 //
-// The dispatch path returns BEFORE reasoning runs — Think schedules
-// reasoning on a fresh goroutine via launchReasoning and returns
+// The dispatch path returns BEFORE thinking runs — Think schedules
+// thinking on a fresh goroutine via launchThinking and returns
 // immediately. This is the energy gradient enforced at the call site.
 type dispatchOutcome int
 
@@ -60,7 +60,7 @@ func (i *Imp) dispatch(ctx context.Context, ch *channelState, msg Message) dispa
 		i.invokeNote(entity, verdict.payload)
 	case verdictThink:
 		i.runtime().metrics.ThinksDispatched.Add(1)
-		i.launchReasoning(verdict.reason, verdict.entity)
+		i.launchThinking(verdict.reason, verdict.entity)
 	}
 	return dispatchOK
 }

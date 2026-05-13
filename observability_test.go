@@ -67,7 +67,7 @@ func TestSlogEventsEmitted(t *testing.T) {
 		Awareness: func(_ context.Context, decoded any, e Entity, _ AwarenessContext) Verdict {
 			return Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, _ any, _ Entity, r ReasoningContext) error {
+		Thinking: func(ctx context.Context, _ any, _ Entity, r ThinkingContext) error {
 			return r.Publish(ctx, "actions.out", []byte("x"))
 		},
 	}

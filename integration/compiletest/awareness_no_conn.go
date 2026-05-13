@@ -4,7 +4,7 @@
 // This file is intentionally NOT included in normal builds. The build tag
 // `awareness_conn_must_fail` activates it; building under that tag MUST
 // fail because imps.AwarenessContext does not expose a Conn method
-// (the raw-*nats.Conn escape hatch is reasoning-only — SC-104, FR-103b).
+// (the raw-*nats.Conn escape hatch is thinking-only — SC-104, FR-103b).
 //
 // To run the assertion:
 //

@@ -11,9 +11,9 @@ import (
 	"github.com/impire-io/imps"
 )
 
-// reasoningCallSpec routes a single Request call through reasoning and
+// thinkingCallSpec routes a single Request call through thinking and
 // captures its (reply, error) outcome on caller-supplied channels.
-func reasoningCallSpec(
+func thinkingCallSpec(
 	subject string,
 	replies chan<- []byte,
 	errs chan<- error,
@@ -36,7 +36,7 @@ func reasoningCallSpec(
 		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
+		Thinking: func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
 			callCtx := ctx
 			if cancelMid {
 				c, cancel := context.WithCancel(ctx)
@@ -62,7 +62,7 @@ func TestRequest_ErrNoResponders(t *testing.T) {
 	replies := make(chan []byte, 1)
 	errs := make(chan error, 1)
 
-	imp, nc, cleanup := startBareImp(t, reasoningCallSpec(
+	imp, nc, cleanup := startBareImp(t, thinkingCallSpec(
 		"nobody.home", replies, errs, false,
 		imps.WithRequestTimeout(2*time.Second),
 	))
@@ -119,7 +119,7 @@ func TestRequest_ErrRequestTimeout(t *testing.T) {
 	replies := make(chan []byte, 1)
 	errs := make(chan error, 1)
 
-	imp, nc, cleanup := startBareImp(t, reasoningCallSpec(
+	imp, nc, cleanup := startBareImp(t, thinkingCallSpec(
 		"slow", replies, errs, false,
 		imps.WithRequestTimeout(50*time.Millisecond),
 	))
@@ -182,7 +182,7 @@ func TestRequest_CtxCanceled(t *testing.T) {
 	replies := make(chan []byte, 1)
 	errs := make(chan error, 1)
 
-	_, nc, cleanup := startBareImp(t, reasoningCallSpec(
+	_, nc, cleanup := startBareImp(t, thinkingCallSpec(
 		"slowcancel", replies, errs, true,
 		imps.WithRequestTimeout(500*time.Millisecond),
 	))

@@ -14,7 +14,7 @@ func minimalSpec() ImpSpec {
 		Awareness: func(context.Context, any, Entity, AwarenessContext) Verdict {
 			return Ignore()
 		},
-		Reasoning: func(context.Context, any, Entity, ReasoningContext) error { return nil },
+		Thinking: func(context.Context, any, Entity, ThinkingContext) error { return nil },
 	}
 }
 
@@ -55,12 +55,12 @@ func TestValidateSpec_NilAwareness(t *testing.T) {
 	}
 }
 
-func TestValidateSpec_NilReasoning(t *testing.T) {
+func TestValidateSpec_NilThinking(t *testing.T) {
 	s := minimalSpec()
-	s.Reasoning = nil
+	s.Thinking = nil
 	var invalid *ErrSpecInvalid
-	if err := validateSpec(s); !errors.As(err, &invalid) || invalid.Field != "Reasoning" {
-		t.Fatalf("expected ErrSpecInvalid{Field:Reasoning}, got %v", err)
+	if err := validateSpec(s); !errors.As(err, &invalid) || invalid.Field != "Thinking" {
+		t.Fatalf("expected ErrSpecInvalid{Field:Thinking}, got %v", err)
 	}
 }
 

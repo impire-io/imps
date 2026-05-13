@@ -29,11 +29,11 @@ func TestNoRequest_FootprintUnchanged(t *testing.T) {
 				return imps.Entity("singleton"), nil
 			},
 		}},
-		// Awareness always returns Note (delivers to OnNote; no reasoning).
+		// Awareness always returns Note (delivers to OnNote; no thinking).
 		Awareness: func(_ context.Context, decoded any, _ imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Note(decoded)
 		},
-		Reasoning: func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
+		Thinking: func(_ context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error {
 			return nil
 		},
 		OnNote: func(_ imps.Entity, _ any) {

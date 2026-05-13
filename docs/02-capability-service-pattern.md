@@ -4,7 +4,7 @@
 
 ---
 
-A capability service is a NATS micro service that handles a specific kind of work for imps — inference, knowledge, tool execution, or anything else an imp reaches for during reasoning. The framework defines no central registry of capabilities, and the framework does no discovery on the imp's behalf. The live capability surface of a deployment is whatever NATS micro services are reachable at a given moment; what's on the other end of a subject is the operator's design.
+A capability service is a NATS micro service that handles a specific kind of work for imps — inference, knowledge, tool execution, or anything else an imp reaches for during thinking. The framework defines no central registry of capabilities, and the framework does no discovery on the imp's behalf. The live capability surface of a deployment is whatever NATS micro services are reachable at a given moment; what's on the other end of a subject is the operator's design.
 
 What's standardized is the *shape*: how a capability service registers, where it sits in the subject hierarchy, what metadata it exposes for operators and tooling, and what operational invariants it satisfies. What's *not* standardized is the wire protocol — endpoints, request/response shapes, error semantics. Those are each capability's own design, recorded in its own spec.
 
@@ -30,7 +30,7 @@ Per-endpoint metadata in `$SRV.INFO` is useful for operators and tooling:
 
 Service-level metadata in `$SRV.INFO` carries:
 
-- Descriptive capability labels (e.g. `["vision", "reasoning"]` for inference) — for human and operator-facing filtering, not routing.
+- Descriptive capability labels (e.g. `["vision", "thinking"]` for inference) — for human and operator-facing filtering, not routing.
 - Service-wide configuration hints relevant to consumers (deployment mode, supported variants, etc.).
 - Anything else that applies to the service as a whole rather than to individual endpoints.
 
@@ -78,7 +78,7 @@ For capabilities where state must be partitioned (a knowledge service backed by 
 
 ## How imps actually call
 
-An imp's code names the subject directly. If a knowledge service registers `knowledge.episode.recall`, the imp's reasoning function calls:
+An imp's code names the subject directly. If a knowledge service registers `knowledge.episode.recall`, the imp's thinking function calls:
 
 ```go
 reply, err := r.Request(ctx, "knowledge.episode.recall", payload)
@@ -88,7 +88,7 @@ No declaration on the imp's spec, no startup verification, no `HasCapability` ch
 
 This trades adaptability for simplicity, deliberately. An imp that wants to handle "is this capability available right now" cases can pull `r.Conn()` and query `$SRV.INFO` itself with the same machinery any other NATS-aware tool uses — the framework offers no built-in equivalent and won't grow one.
 
-The boundedness gate is structural, on the imp's side. Awareness has `Request` only; `RequestMany`, `Publish`, and `Conn` are absent from its context. Reasoning has the full surface. The framework does not read endpoint metadata to decide what awareness can call — call-shape is the criterion.
+The boundedness gate is structural, on the imp's side. Awareness has `Request` only; `RequestMany`, `Publish`, and `Conn` are absent from its context. Thinking has the full surface. The framework does not read endpoint metadata to decide what awareness can call — call-shape is the criterion.
 
 ## Audit and statistics
 
@@ -131,7 +131,7 @@ The inference service spec ([reference]) implements this pattern:
 
 - Registers as a NATS micro service with a configurable `name`.
 - Two endpoints (`prompt`, `embed`), each on its own subject.
-- Service-level metadata declares capability labels (`vision`, `reasoning`, etc.) for descriptive filtering.
+- Service-level metadata declares capability labels (`vision`, `thinking`, etc.) for descriptive filtering.
 - Endpoint-level metadata declares request/response schemas.
 - Stateless per request; no prompt or response content persists on the instance.
 - Heterogeneity is one model per instance; running multiple instances with different models gives the cluster heterogeneous capabilities.

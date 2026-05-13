@@ -16,12 +16,12 @@ const natsStatusHdr = "Status"
 
 // RequestOption configures a single Request invocation. Pass instances
 // returned by WithRequestTimeout to AwarenessContext.Request or
-// ReasoningContext.Request.
+// ThinkingContext.Request.
 type RequestOption func(*requestOptions)
 
 // RequestManyOption configures a single RequestMany invocation. Pass
 // instances returned by WithRequestManyWindow / WithRequestManyMax to
-// ReasoningContext.RequestMany.
+// ThinkingContext.RequestMany.
 type RequestManyOption func(*requestManyOptions)
 
 type requestOptions struct {

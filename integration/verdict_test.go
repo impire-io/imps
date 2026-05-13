@@ -13,8 +13,8 @@ import (
 )
 
 // noteSpec returns an imp with a configurable awareness function and a
-// recording OnNote hook. Reasoning publishes "reasoned" so tests can
-// observe whether reasoning ran.
+// recording OnNote hook. Thinking publishes "reasoned" so tests can
+// observe whether thinking ran.
 func noteSpec(awareness imps.AwarenessFn, onNote func(imps.Entity, any)) imps.ImpSpec {
 	return imps.ImpSpec{
 		Name:    "verdict-test",
@@ -30,7 +30,7 @@ func noteSpec(awareness imps.AwarenessFn, onNote func(imps.Entity, any)) imps.Im
 			},
 		}},
 		Awareness: awareness,
-		Reasoning: func(ctx context.Context, _ any, _ imps.Entity, r imps.ReasoningContext) error {
+		Thinking: func(ctx context.Context, _ any, _ imps.Entity, r imps.ThinkingContext) error {
 			return r.Publish(ctx, "actions.out", []byte("reasoned"))
 		},
 		OnNote: onNote,
@@ -59,7 +59,7 @@ func TestIgnoreVerdict(t *testing.T) {
 	go func() { _ = imp.Run(ctx) }()
 	waitReady(t, imp)
 
-	// Watch actions.out to confirm no reasoning was queued.
+	// Watch actions.out to confirm no thinking was queued.
 	got := make(chan struct{}, 1)
 	if _, err := nc.Subscribe("actions.out", func(*nats.Msg) { got <- struct{}{} }); err != nil {
 		t.Fatal(err)
@@ -81,7 +81,7 @@ func TestIgnoreVerdict(t *testing.T) {
 	}
 	select {
 	case <-got:
-		t.Fatalf("Ignore must not queue reasoning")
+		t.Fatalf("Ignore must not queue thinking")
 	default:
 	}
 
@@ -137,11 +137,11 @@ func TestNoteVerdict(t *testing.T) {
 		t.Fatal("OnNote not invoked within 1s")
 	}
 
-	// Ensure reasoning didn't run.
+	// Ensure thinking didn't run.
 	time.Sleep(100 * time.Millisecond)
 	select {
 	case <-gotAction:
-		t.Fatal("Note must not queue reasoning")
+		t.Fatal("Note must not queue thinking")
 	default:
 	}
 
@@ -159,21 +159,21 @@ func TestThinkVerdictAsync(t *testing.T) {
 	nc, _ := nats.Connect(srv.URL())
 	t.Cleanup(func() { nc.Close() })
 
-	reasoningStarted := make(chan struct{})
-	releaseReasoning := make(chan struct{})
+	thinkingStarted := make(chan struct{})
+	releaseThinking := make(chan struct{})
 
 	var dispatched atomic.Bool
 	awareness := func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 		// dispatched is set to true when awareness is RETURNING — proves
-		// dispatch did not block on reasoning.
+		// dispatch did not block on thinking.
 		defer dispatched.Store(true)
 		return imps.Think(decoded, e)
 	}
 
 	spec := noteSpec(awareness, nil)
-	spec.Reasoning = func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
-		close(reasoningStarted)
-		<-releaseReasoning
+	spec.Thinking = func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
+		close(thinkingStarted)
+		<-releaseThinking
 		return r.Publish(ctx, "actions.out", []byte(reason.(string)))
 	}
 
@@ -190,19 +190,19 @@ func TestThinkVerdictAsync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Reasoning must start (proves Think queued it) but dispatch returns
-	// before reasoning completes (we never released it).
+	// Thinking must start (proves Think queued it) but dispatch returns
+	// before thinking completes (we never released it).
 	select {
-	case <-reasoningStarted:
+	case <-thinkingStarted:
 	case <-time.After(time.Second):
-		t.Fatal("reasoning never started")
+		t.Fatal("thinking never started")
 	}
 	if !dispatched.Load() {
-		t.Fatal("dispatch did not return before reasoning observed")
+		t.Fatal("dispatch did not return before thinking observed")
 	}
 
-	close(releaseReasoning)
-	// Give reasoning room to complete and the WaitGroup to drain.
+	close(releaseThinking)
+	// Give thinking room to complete and the WaitGroup to drain.
 	time.Sleep(100 * time.Millisecond)
 
 	m := imp.Metrics()

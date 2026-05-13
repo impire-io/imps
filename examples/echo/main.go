@@ -1,6 +1,6 @@
 // Echo is the worked example from specs/001-harness-core/quickstart.md.
-// It subscribes to messages.in, awareness always escalates to reasoning,
-// and reasoning publishes the payload back to actions.out — both on literal
+// It subscribes to messages.in, awareness always escalates to thinking,
+// and thinking publishes the payload back to actions.out — both on literal
 // subjects, since the framework performs no subject transformation.
 package main
 
@@ -39,7 +39,7 @@ func main() {
 		Awareness: func(_ context.Context, decoded any, entity imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Think(decoded, entity)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
+		Thinking: func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
 			payload := []byte(reason.(string))
 			return r.Publish(ctx, "actions.out", payload)
 		},
