@@ -40,7 +40,7 @@ func streamSetup(t *testing.T, streamName, source string) (*nats.Conn, jetstream
 	return nc, js
 }
 
-func streamSpec(awareness imps.AwarenessFn, durable string, reasoning imps.ReasoningFn) imps.ImpSpec {
+func streamSpec(awareness imps.AwarenessFn, durable string, thinking imps.ThinkingFn) imps.ImpSpec {
 	return imps.ImpSpec{
 		Name:    "stream-imp",
 		Version: "0.1.0",
@@ -59,7 +59,7 @@ func streamSpec(awareness imps.AwarenessFn, durable string, reasoning imps.Reaso
 			},
 		}},
 		Awareness: awareness,
-		Reasoning: reasoning,
+		Thinking:  thinking,
 	}
 }
 
@@ -116,7 +116,7 @@ func TestStreamChannelDurableHappyPath(t *testing.T) {
 			return imps.Think(decoded, e)
 		},
 		"echo-orders",
-		func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
+		func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
 			return r.Publish(ctx, "actions.out", []byte(reason.(string)))
 		},
 	)
@@ -170,7 +170,7 @@ func TestEphemeralConsumerLifecycle(t *testing.T) {
 			return imps.Ignore()
 		},
 		"", // ephemeral
-		func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil },
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error { return nil },
 	)
 	_, cleanup := runStreamImp(t, nc, spec)
 
@@ -215,7 +215,7 @@ func TestStreamNotFound(t *testing.T) {
 			return imps.Ignore()
 		},
 		"any",
-		func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil },
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error { return nil },
 	)
 
 	imp, err := imps.NewImp(spec, nc)
@@ -252,7 +252,7 @@ func TestConsumerIncompatible(t *testing.T) {
 			return imps.Ignore()
 		},
 		"echo-orders",
-		func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil },
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error { return nil },
 	)
 
 	imp, err := imps.NewImp(spec, nc)
@@ -280,8 +280,8 @@ func TestAckAtAwarenessCompletion(t *testing.T) {
 			return imps.Think(decoded, e)
 		},
 		"echo-orders",
-		func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
-			// Hold reasoning to prove ack happens BEFORE reasoning completes.
+		func(ctx context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error {
+			// Hold thinking to prove ack happens BEFORE thinking completes.
 			select {
 			case <-time.After(500 * time.Millisecond):
 			case <-ctx.Done():
@@ -297,7 +297,7 @@ func TestAckAtAwarenessCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Within 200 ms (well before reasoning completes at 500 ms), the
+	// Within 200 ms (well before thinking completes at 500 ms), the
 	// consumer's pending count must drop to zero.
 	deadline := time.Now().Add(300 * time.Millisecond)
 	pending := 1
@@ -324,7 +324,7 @@ func TestAckAtAwarenessCompletion(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	if pending != 0 {
-		t.Fatalf("ack should be sent before reasoning completes; pending=%d", pending)
+		t.Fatalf("ack should be sent before thinking completes; pending=%d", pending)
 	}
 }
 
@@ -342,7 +342,7 @@ func TestStreamNakOnFailures(t *testing.T) {
 			return imps.Think(decoded, e)
 		},
 		"echo-orders",
-		func(ctx context.Context, _ any, _ imps.Entity, r imps.ReasoningContext) error {
+		func(ctx context.Context, _ any, _ imps.Entity, r imps.ThinkingContext) error {
 			return r.Publish(ctx, "actions.out", []byte("ok"))
 		},
 	)

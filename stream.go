@@ -309,7 +309,7 @@ func (i *Imp) dispatchStream(ch *channelState, msg jetstream.Msg) {
 		i.invokeNote(entity, verdict.payload)
 	case verdictThink:
 		i.runtime().metrics.ThinksDispatched.Add(1)
-		i.launchReasoning(verdict.reason, verdict.entity)
+		i.launchThinking(verdict.reason, verdict.entity)
 	}
 }
 

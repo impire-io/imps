@@ -6,7 +6,7 @@
 
 An **imp** is a small, focused, awareness-driven agent. It watches a slice of the world, builds an interpretation of what it sees, and acts when its interpretation crosses a threshold worth acting on. One imp does one thing.
 
-What this framework gives you is the structure an imp is built around: receiving messages, interpreting them cheaply, reasoning about them when reasoning is warranted, and emitting actions. The framework stays small. The capabilities an imp can reach for — inference, knowledge, tooling — live outside it as separate services.
+What this framework gives you is the structure an imp is built around: receiving messages, interpreting them cheaply, thinking about them when thinking is warranted, and emitting actions. The framework stays small. The capabilities an imp can reach for — inference, knowledge, tooling — live outside it as separate services.
 
 This document records the framing the rest of the design hangs from. Everything else is a consequence of these choices.
 
@@ -24,20 +24,20 @@ A human brain spends almost no energy on most of what reaches the senses. Attent
 
 Inside an imp:
 
-- **Awareness** is cheap. Local interpretation, bounded resource use, deterministic latency. Awareness runs continuously, on every message, and decides whether reasoning is warranted.
-- **Reasoning** is expensive. LLM calls, multi-step tool use, semantic recall over large corpora. Reasoning runs only when awareness escalates.
+- **Awareness** is cheap. Local interpretation, bounded resource use, deterministic latency. Awareness runs continuously, on every message, and decides whether thinking is warranted.
+- **Thinking** is expensive. LLM calls, multi-step tool use, semantic recall over large corpora. Thinking runs only when awareness escalates.
 
-This isn't a coding convention — it's a structural invariant the framework enforces. Awareness has a tightly-bounded surface for the capabilities it can call (a single embed, a budget-capped classification, a key-only lookup); reasoning has the full surface (agentic loops, semantic search, tool invocation, delegation). A developer cannot accidentally make awareness expensive because the surface for expensive operations isn't available there.
+This isn't a coding convention — it's a structural invariant the framework enforces. Awareness has a tightly-bounded surface for the capabilities it can call (a single embed, a budget-capped classification, a key-only lookup); thinking has the full surface (agentic loops, semantic search, tool invocation, delegation). A developer cannot accidentally make awareness expensive because the surface for expensive operations isn't available there.
 
-The boundary lives at the framework level, not the implementation level. What awareness *is* is "the part of the imp that runs cheaply on every message." What reasoning *is* is "the part that runs occasionally, and is allowed to do expensive things."
+The boundary lives at the framework level, not the implementation level. What awareness *is* is "the part of the imp that runs cheaply on every message." What thinking *is* is "the part that runs occasionally, and is allowed to do expensive things."
 
 ## The framework is small; capabilities are external
 
 The framework gives an imp:
 
 - Channels — how messages reach the imp.
-- Awareness — cheap, local interpretation; decides when reasoning runs.
-- Reasoning — expensive deliberation; allowed to call capabilities.
+- Awareness — cheap, local interpretation; decides when thinking runs.
+- Thinking — expensive deliberation; allowed to call capabilities.
 - Memory — *local*, bounded state per entity the imp is currently tracking.
 - Action — outbound publishing to channels.
 
@@ -51,7 +51,7 @@ What the framework does *not* give an imp:
 - Cross-imp shared state.
 - Heavy indexes (vector, graph) over large corpora.
 
-Those live in **capability services** — separate NATS services that imps reach for during reasoning. A capability service is a regular NATS micro service that handles a specific kind of work. Knowledge is a capability. Inference is a capability. Tool execution is a capability. The framework is small precisely because these aren't part of it.
+Those live in **capability services** — separate NATS services that imps reach for during thinking. A capability service is a regular NATS micro service that handles a specific kind of work. Knowledge is a capability. Inference is a capability. Tool execution is a capability. The framework is small precisely because these aren't part of it.
 
 The shape this gives the system: an imp is a thin orchestrator. It sees messages, holds enough state to decide what to do with them, and reaches for capabilities when the work warrants. The intelligence isn't in the imp; it's in what the imp can call.
 
@@ -85,7 +85,7 @@ The framework keeps the soulstream's mechanics simple by default — sequential 
 
 An imp holds local state for the entities it's currently tracking — recent messages, running statistics, current state, in-flight work. That's it. The imp does not hold the colony's history.
 
-Long-term memory — closed topics, completed actions, prior episodes, accumulated facts — lives in the **knowledge capability**. Imps reach for it during reasoning when context from outside the immediate moment is needed. The knowledge service can be backed by anything that fits the scope (Elasticsearch, vector store, graph store, combinations); imps see a uniform protocol regardless of the backing.
+Long-term memory — closed topics, completed actions, prior episodes, accumulated facts — lives in the **knowledge capability**. Imps reach for it during thinking when context from outside the immediate moment is needed. The knowledge service can be backed by anything that fits the scope (Elasticsearch, vector store, graph store, combinations); imps see a uniform protocol regardless of the backing.
 
 Two scopes that matter and are usefully distinct:
 
@@ -112,6 +112,6 @@ The framework is not a platform for building one big intelligent thing. It's a s
 
 ---
 
-The rest of the documents in this set work out the consequences. The anatomy document specifies what awareness and reasoning are, what they can do, and what the boundary between them looks like. The capability service pattern specifies the shared deployment shape. Per-capability specs define their wire protocols. The soulstream document specifies coordination. The developer-surface document specifies what writing an imp actually looks like in code.
+The rest of the documents in this set work out the consequences. The anatomy document specifies what awareness and thinking are, what they can do, and what the boundary between them looks like. The capability service pattern specifies the shared deployment shape. Per-capability specs define their wire protocols. The soulstream document specifies coordination. The developer-surface document specifies what writing an imp actually looks like in code.
 
 If a future change conflicts with anything in this document, this document is what changes — not silently, not by drift, but explicitly, with the rationale. The vision is the load-bearing layer; everything else is implementation of it.

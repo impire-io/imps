@@ -30,7 +30,7 @@ func echoSpec(awareness imps.AwarenessFn) imps.ImpSpec {
 			},
 		}},
 		Awareness: awareness,
-		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
+		Thinking: func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
 			payload := []byte(reason.(string))
 			return r.Publish(ctx, "actions.out", payload)
 		},
@@ -261,8 +261,8 @@ func TestAwarenessPanicRecovers(t *testing.T) {
 	if m.AwarenessPanics != 1 {
 		t.Fatalf("expected 1 awareness panic, got %d", m.AwarenessPanics)
 	}
-	// Reasoning should NOT have run for the panicking message: only one
-	// successful awareness → one Think → one reasoning invocation.
+	// Thinking should NOT have run for the panicking message: only one
+	// successful awareness → one Think → one thinking invocation.
 	if m.ThinksDispatched != 1 {
 		t.Fatalf("expected exactly 1 Think, got %d", m.ThinksDispatched)
 	}

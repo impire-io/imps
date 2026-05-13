@@ -30,7 +30,7 @@ func defaultRuntimeOptions() runtimeOptions {
 type Option func(*runtimeOptions)
 
 // WithDrainWindow sets the maximum time Shutdown will wait for in-flight
-// reasoning to complete. Default is 30s.
+// thinking to complete. Default is 30s.
 func WithDrainWindow(d time.Duration) Option {
 	return func(o *runtimeOptions) {
 		o.drainWindow = d

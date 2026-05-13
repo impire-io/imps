@@ -43,14 +43,14 @@ type runtime struct {
 	logger   logger
 
 	awareness *awarenessCtx
-	reasoning *reasoningCtx
+	thinking  *thinkingCtx
 
-	// reasoningCtx is the context handed to user reasoning functions.
-	// Cancelled when shutdown begins so reasoning can exit cooperatively.
-	reasoningCtx    context.Context
-	reasoningCancel context.CancelFunc
+	// thinkingCtx is the context handed to user thinking functions.
+	// Cancelled when shutdown begins so thinking can exit cooperatively.
+	thinkingCtx    context.Context
+	thinkingCancel context.CancelFunc
 
-	reasoningWG sync.WaitGroup
+	thinkingWG sync.WaitGroup
 
 	channels []*channelState
 
@@ -161,13 +161,13 @@ func (i *Imp) bootRuntime() error {
 		rCtx, rCancel := context.WithCancel(context.Background())
 
 		rt := &runtime{
-			registry:        reg,
-			metrics:         m,
-			logger:          lg,
-			reasoningCtx:    rCtx,
-			reasoningCancel: rCancel,
-			state:           lifecycle.New(),
-			stopped:         make(chan struct{}),
+			registry:       reg,
+			metrics:        m,
+			logger:         lg,
+			thinkingCtx:    rCtx,
+			thinkingCancel: rCancel,
+			state:          lifecycle.New(),
+			stopped:        make(chan struct{}),
 		}
 		rt.awareness = &awarenessCtx{
 			registry:              reg,
@@ -176,7 +176,7 @@ func (i *Imp) bootRuntime() error {
 			logger:                lg,
 			defaultRequestTimeout: i.opts.defaultRequestTimeout,
 		}
-		rt.reasoning = &reasoningCtx{
+		rt.thinking = &thinkingCtx{
 			registry:                 reg,
 			conn:                     i.nc,
 			metrics:                  m,
@@ -194,8 +194,8 @@ func (i *Imp) bootRuntime() error {
 }
 
 // Shutdown initiates graceful shutdown: stops accepting new messages,
-// cancels in-flight reasoning's context, waits up to drain_window for
-// reasoning to complete, and returns no later than drain_window + ε.
+// cancels in-flight thinking's context, waits up to drain_window for
+// thinking to complete, and returns no later than drain_window + ε.
 //
 // Calling Shutdown more than once is safe. The supplied ctx is honored
 // only as an upper bound — the drain window also applies.
@@ -212,15 +212,15 @@ func (i *Imp) Shutdown(_ context.Context) error {
 		// Phase 1: stop accepting new messages.
 		i.unwind()
 
-		// Phase 2: cancel reasoning context so cooperative reasoning can exit.
-		rt.reasoningCancel()
+		// Phase 2: cancel thinking context so cooperative thinking can exit.
+		rt.thinkingCancel()
 
-		// Phase 3: wait up to drain_window for in-flight reasoning to complete.
+		// Phase 3: wait up to drain_window for in-flight thinking to complete.
 		rt.shutdownErr = i.waitDrain()
 
 		rt.state.Set(lifecycle.StateStopped)
 		rt.logger.info("imp shutdown end",
-			"pending_reasoning", rt.metrics.InflightReasoning.Load(),
+			"pending_thinking", rt.metrics.InflightThinking.Load(),
 		)
 		close(rt.stopped)
 	})
@@ -228,14 +228,14 @@ func (i *Imp) Shutdown(_ context.Context) error {
 	return rt.shutdownErr
 }
 
-// waitDrain blocks for up to opts.drainWindow on the reasoning WaitGroup.
-// Returns nil if all reasoning completed; returns context.DeadlineExceeded
+// waitDrain blocks for up to opts.drainWindow on the thinking WaitGroup.
+// Returns nil if all thinking completed; returns context.DeadlineExceeded
 // (joined with no other error) if the deadline expired.
 func (i *Imp) waitDrain() error {
 	rt := i.runtime()
 	done := make(chan struct{})
 	go func() {
-		rt.reasoningWG.Wait()
+		rt.thinkingWG.Wait()
 		close(done)
 	}()
 	select {
@@ -243,7 +243,7 @@ func (i *Imp) waitDrain() error {
 		return nil
 	case <-time.After(i.opts.drainWindow):
 		rt.logger.warn("drain deadline exceeded",
-			"pending_reasoning", rt.metrics.InflightReasoning.Load(),
+			"pending_thinking", rt.metrics.InflightThinking.Load(),
 		)
 		return errors.Join(context.DeadlineExceeded, errors.New("imps: drain window exceeded"))
 	}

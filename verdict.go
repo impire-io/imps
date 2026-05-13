@@ -22,22 +22,22 @@ type Verdict struct {
 }
 
 // Ignore returns a Verdict that produces no further side effect. Dispatch
-// returns immediately; no reasoning is queued and no Note is recorded.
+// returns immediately; no thinking is queued and no Note is recorded.
 func Ignore() Verdict {
 	return Verdict{kind: verdictIgnore}
 }
 
 // Note returns a Verdict that delivers the payload to the imp's OnNote hook
-// if registered, and records the verdict in NotesDelivered. No reasoning is
+// if registered, and records the verdict in NotesDelivered. No thinking is
 // queued.
 func Note(payload any) Verdict {
 	return Verdict{kind: verdictNote, payload: payload}
 }
 
-// Think returns a Verdict that queues reasoning asynchronously with the
-// supplied reason and entity. Channel dispatch returns before reasoning
+// Think returns a Verdict that queues thinking asynchronously with the
+// supplied reason and entity. Channel dispatch returns before thinking
 // runs. The entity carried by Think may differ from the message entity —
-// awareness is allowed to redirect reasoning to a different entity.
+// awareness is allowed to redirect thinking to a different entity.
 func Think(reason any, entity Entity) Verdict {
 	return Verdict{kind: verdictThink, reason: reason, entity: entity}
 }

@@ -12,10 +12,10 @@ import (
 	"github.com/impire-io/imps"
 )
 
-// twoCallReasoningSpec drives two Request calls per reasoning invocation:
+// twoCallThinkingSpec drives two Request calls per thinking invocation:
 // first against fastSubject (uses harness default), then against slowSubject
 // (uses per-call WithRequestTimeout(perCallTO)). Captures both outcomes.
-func twoCallReasoningSpec(
+func twoCallThinkingSpec(
 	fastSubject, slowSubject string,
 	perCallTO time.Duration,
 	fastReplies chan<- []byte,
@@ -37,7 +37,7 @@ func twoCallReasoningSpec(
 		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
+		Thinking: func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
 			reply, err := r.Request(ctx, fastSubject, reason.([]byte))
 			if err != nil {
 				slowErrs <- err
@@ -59,7 +59,7 @@ func TestRequest_PerCallTimeoutPrecedence(t *testing.T) {
 	fastReplies := make(chan []byte, 1)
 	slowErrs := make(chan error, 2)
 
-	_, nc, cleanup := startBareImp(t, twoCallReasoningSpec(
+	_, nc, cleanup := startBareImp(t, twoCallThinkingSpec(
 		"fast", "slow", 5*time.Millisecond,
 		fastReplies, slowErrs,
 	),
@@ -117,7 +117,7 @@ func TestRequest_NoRetryOnTimeout(t *testing.T) {
 	replies := make(chan []byte, 1)
 	errs := make(chan error, 1)
 
-	_, nc, cleanup := startBareImp(t, reasoningCallSpec(
+	_, nc, cleanup := startBareImp(t, thinkingCallSpec(
 		"count.me", replies, errs, false,
 		imps.WithRequestTimeout(50*time.Millisecond),
 	))
@@ -167,7 +167,7 @@ func TestRequestMany_PerCallWindowAndMax(t *testing.T) {
 	replies := make(chan [][]byte, 1)
 	errs := make(chan error, 1)
 
-	_, nc, cleanup := startBareImp(t, reasoningManySpec(
+	_, nc, cleanup := startBareImp(t, thinkingManySpec(
 		"override.fanout", replies, errs, "",
 		imps.WithRequestManyWindow(300*time.Millisecond),
 		imps.WithRequestManyMax(2),

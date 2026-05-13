@@ -7,7 +7,7 @@ import (
 )
 
 // BenchmarkDispatchOverhead measures the per-message dispatch overhead
-// across various inflight-reasoning and tracked-entity counts. The harness
+// across various inflight-thinking and tracked-entity counts. The harness
 // commitment (SC-010) is sub-linear growth in both dimensions; the bench
 // exists to catch obvious regressions, not to publish absolute numbers.
 //
@@ -16,9 +16,9 @@ import (
 // substrate's.
 func BenchmarkDispatchOverhead(b *testing.B) {
 	cases := []struct {
-		name              string
-		inflightReasoning int
-		trackedEntities   int
+		name             string
+		inflightThinking int
+		trackedEntities  int
 	}{
 		{"baseline", 0, 10},
 		{"inflight=100", 100, 10},
@@ -28,7 +28,7 @@ func BenchmarkDispatchOverhead(b *testing.B) {
 	}
 	for _, c := range cases {
 		b.Run(c.name, func(b *testing.B) {
-			imp, ch, release := dispatchBenchSetup(b, c.inflightReasoning, c.trackedEntities)
+			imp, ch, release := dispatchBenchSetup(b, c.inflightThinking, c.trackedEntities)
 			defer release()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -43,8 +43,8 @@ func BenchmarkDispatchOverhead(b *testing.B) {
 }
 
 // BenchmarkDispatchThinkReturns measures dispatch return latency when the
-// verdict is Think. Reasoning blocks until released; the benchmark exits
-// far before that — proving dispatch returns regardless of reasoning
+// verdict is Think. Thinking blocks until released; the benchmark exits
+// far before that — proving dispatch returns regardless of thinking
 // latency (FR-016, FR-020).
 func BenchmarkDispatchThinkReturns(b *testing.B) {
 	imp, ch, release := dispatchBenchSetup(b, 0, 1)
@@ -60,7 +60,7 @@ func BenchmarkDispatchThinkReturns(b *testing.B) {
 
 // dispatchBenchSetup builds an Imp wired up for in-process dispatch with a
 // fake NATS connection (we never touch the substrate in dispatch). Returns
-// the imp, a channel state, and a release func that drains held reasoning.
+// the imp, a channel state, and a release func that drains held thinking.
 func dispatchBenchSetup(b *testing.B, preheatInflight, entityCap int) (*Imp, *channelState, func()) {
 	b.Helper()
 	release := make(chan struct{})
@@ -85,7 +85,7 @@ func dispatchBenchSetup(b *testing.B, preheatInflight, entityCap int) (*Imp, *ch
 		Awareness: func(_ context.Context, _ any, e Entity, _ AwarenessContext) Verdict {
 			return Think("bench", e)
 		},
-		Reasoning: func(ctx context.Context, _ any, _ Entity, _ ReasoningContext) error {
+		Thinking: func(ctx context.Context, _ any, _ Entity, _ ThinkingContext) error {
 			select {
 			case <-release:
 			case <-ctx.Done():
@@ -102,15 +102,15 @@ func dispatchBenchSetup(b *testing.B, preheatInflight, entityCap int) (*Imp, *ch
 	}
 	ch := &channelState{spec: spec.Channels[0], subject: "bench"}
 
-	// Pre-heat in-flight reasoning by directly launching the configured
+	// Pre-heat in-flight thinking by directly launching the configured
 	// number of goroutines that block on `release`.
 	for i := 0; i < preheatInflight; i++ {
-		imp.launchReasoning("preheat", "preheat-entity")
+		imp.launchThinking("preheat", "preheat-entity")
 	}
 
 	return imp, ch, func() {
 		close(release)
-		imp.runtime().reasoningWG.Wait()
+		imp.runtime().thinkingWG.Wait()
 	}
 }
 

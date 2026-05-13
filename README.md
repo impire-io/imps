@@ -2,13 +2,13 @@
 
 A Go framework for building small, focused, awareness-driven agents that run on NATS.
 
-An **imp** is your program. You declare its inbound channels (NATS subjects or JetStream streams), an awareness function (cheap, runs on every message), a reasoning function (expensive, runs only when awareness escalates), and per-entity local state. The framework wires up subscriptions, dispatch, goroutine management, and the outbound NATS surface — request/reply, fan-out request/reply, and fire-and-forget publish.
+An **imp** is your program. You declare its inbound channels (NATS subjects or JetStream streams), an awareness function (cheap, runs on every message), a thinking function (expensive, runs only when awareness escalates), and per-entity local state. The framework wires up subscriptions, dispatch, goroutine management, and the outbound NATS surface — request/reply, fan-out request/reply, and fire-and-forget publish.
 
-> The boundary between cheap awareness and expensive reasoning is **structural**, not a coding convention. Awareness can issue a single request/reply and nothing else; reasoning gets the full outbound surface — request/reply, fan-out, fire-and-forget publish, and raw NATS access. Awareness code that tries to fan out, fire-and-forget, or grab the raw connection fails to compile.
+> The boundary between cheap awareness and expensive thinking is **structural**, not a coding convention. Awareness can issue a single request/reply and nothing else; thinking gets the full outbound surface — request/reply, fan-out, fire-and-forget publish, and raw NATS access. Awareness code that tries to fan out, fire-and-forget, or grab the raw connection fails to compile.
 
 ## Status
 
-- Core surface — channels, awareness, reasoning, local state, request/reply, publish — shipped via PR #1 and PR #2.
+- Core surface — channels, awareness, thinking, local state, request/reply, publish — shipped via PR #1 and PR #2.
 - Capabilities, soulstream, sleep/wake, persistence, audit: out of scope here, ship as separate features.
 
 ## Install
@@ -56,7 +56,7 @@ func main() {
         Awareness: func(ctx context.Context, decoded any, entity imps.Entity, a imps.AwarenessContext) imps.Verdict {
             return imps.Think(decoded, entity)
         },
-        Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
+        Thinking: func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
             return r.Publish(ctx, "actions.out", []byte(reason.(string)))
         },
     }
@@ -89,8 +89,8 @@ A complete runnable version (with embedded-server test) lives in [`examples/echo
 | Concept | What it does |
 |---|---|
 | **Channels** | Inbound NATS subscriptions (core subject or JetStream stream). Decode bytes, extract an entity, dispatch into awareness. |
-| **Awareness** | Cheap, synchronous, runs on every message. Returns one of three verdicts: ignore, deliver a note, or escalate to reasoning. |
-| **Reasoning** | Expensive, runs in a fresh goroutine each time awareness escalates. Allowed to publish, fan out, and reach the raw connection. |
+| **Awareness** | Cheap, synchronous, runs on every message. Returns one of three verdicts: ignore, deliver a note, or escalate to thinking. |
+| **Thinking** | Expensive, runs in a fresh goroutine each time awareness escalates. Allowed to publish, fan out, and reach the raw connection. |
 | **Memory** | Per-entity local state, bounded by a per-shape cap. Get / set / update. |
 | **Action** | Outbound NATS sends — single request/reply, fan-out request/reply, or fire-and-forget publish. |
 

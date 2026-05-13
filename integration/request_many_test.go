@@ -13,12 +13,12 @@ import (
 	"github.com/impire-io/imps"
 )
 
-// reasoningManySpec builds an imp whose reasoning calls
+// thinkingManySpec builds an imp whose thinking calls
 // r.RequestMany(subject, payload, manyOpts...) and forwards both the
 // collected replies and any error to caller-supplied channels for the
 // test to assert on. Optionally it also performs a Publish to assert
-// US-4 (c) — reasoning has the full outbound surface.
-func reasoningManySpec(
+// US-4 (c) — thinking has the full outbound surface.
+func thinkingManySpec(
 	subject string,
 	replies chan<- [][]byte,
 	errs chan<- error,
@@ -41,7 +41,7 @@ func reasoningManySpec(
 		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
+		Thinking: func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
 			got, err := r.RequestMany(ctx, subject, reason.([]byte), manyOpts...)
 			if err != nil {
 				errs <- err
@@ -56,14 +56,14 @@ func reasoningManySpec(
 	}
 }
 
-// TestReasoning_HasFullSurface — US-4 AS-3: reasoning successfully invokes
+// TestThinking_HasFullSurface — US-4 AS-3: thinking successfully invokes
 // r.RequestMany against one responder and r.Publish against an unrelated
-// subject. Confirms the methods exist and work on ReasoningContext.
-func TestReasoning_HasFullSurface(t *testing.T) {
+// subject. Confirms the methods exist and work on ThinkingContext.
+func TestThinking_HasFullSurface(t *testing.T) {
 	replies := make(chan [][]byte, 1)
 	errs := make(chan error, 1)
 
-	imp, nc, cleanup := startBareImp(t, reasoningManySpec(
+	imp, nc, cleanup := startBareImp(t, thinkingManySpec(
 		"health.ping", replies, errs, "actions.out",
 		imps.WithRequestManyWindow(200*time.Millisecond),
 	))
@@ -111,7 +111,7 @@ func TestRequestMany_HappyPath(t *testing.T) {
 	replies := make(chan [][]byte, 1)
 	errs := make(chan error, 1)
 
-	imp, nc, cleanup := startBareImp(t, reasoningManySpec(
+	imp, nc, cleanup := startBareImp(t, thinkingManySpec(
 		"health.ping", replies, errs, "",
 		imps.WithRequestManyWindow(200*time.Millisecond),
 	))
@@ -182,7 +182,7 @@ func TestRequestMany_MaxCapEarlyExit(t *testing.T) {
 	replies := make(chan [][]byte, 1)
 	errs := make(chan error, 1)
 
-	_, nc, cleanup := startBareImp(t, reasoningManySpec(
+	_, nc, cleanup := startBareImp(t, thinkingManySpec(
 		"health.fanout", replies, errs, "",
 		imps.WithRequestManyWindow(500*time.Millisecond),
 		imps.WithRequestManyMax(3),
@@ -228,7 +228,7 @@ func TestRequestMany_WindowElapseNoResponders(t *testing.T) {
 	replies := make(chan [][]byte, 1)
 	errs := make(chan error, 1)
 
-	_, nc, cleanup := startBareImp(t, reasoningManySpec(
+	_, nc, cleanup := startBareImp(t, thinkingManySpec(
 		"health.empty", replies, errs, "",
 		imps.WithRequestManyWindow(100*time.Millisecond),
 	))
@@ -272,7 +272,7 @@ func TestRequestMany_WindowElapseNoResponders(t *testing.T) {
 
 // TestRequestMany_InboxCleanup — FR-113. Drive several RequestMany calls
 // through the imp and assert the connection's subscription count returns
-// to its baseline. We use direct reasoning-context calls instead of a
+// to its baseline. We use direct thinking-context calls instead of a
 // full dispatch flow so we can probe nc.NumSubscriptions deterministically.
 func TestRequestMany_InboxCleanup(t *testing.T) {
 	// Reuse the dispatch-driven path: each scenario above runs a single
@@ -298,7 +298,7 @@ func TestRequestMany_InboxCleanup(t *testing.T) {
 		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, _ any, _ imps.Entity, r imps.ReasoningContext) error {
+		Thinking: func(ctx context.Context, _ any, _ imps.Entity, r imps.ThinkingContext) error {
 			got, err := r.RequestMany(ctx, "cleanup.out", nil,
 				imps.WithRequestManyWindow(60*time.Millisecond),
 			)
@@ -357,7 +357,7 @@ func TestSubjectsAreLiteral_RequestMany_Publish(t *testing.T) {
 	replies := make(chan [][]byte, 1)
 	errs := make(chan error, 1)
 
-	_, nc, cleanup := startBareImp(t, reasoningManySpec(
+	_, nc, cleanup := startBareImp(t, thinkingManySpec(
 		"health.ping", replies, errs, "actions.out",
 		imps.WithRequestManyWindow(200*time.Millisecond),
 	))

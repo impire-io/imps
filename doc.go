@@ -2,15 +2,15 @@
 // single small surface:
 //
 //   - ImpSpec: declarative description of an imp (channels, awareness,
-//     reasoning, local-state shapes, optional Note hook).
+//     thinking, local-state shapes, optional Note hook).
 //   - NewImp / Imp.Run / Imp.Shutdown / Imp.Identity / Imp.Ready /
 //     Imp.Metrics: the runtime handle and lifecycle.
 //   - Verdict: closed sum returned by awareness — Ignore, Note(payload),
 //     Think(reason, entity).
-//   - AwarenessContext / ReasoningContext: typed surfaces; the energy
+//   - AwarenessContext / ThinkingContext: typed surfaces; the energy
 //     gradient is structural — AwarenessContext exposes State and
 //     Request only, so calling awareness.RequestMany(...), Publish(...),
-//     or Conn() does not compile. ReasoningContext exposes State,
+//     or Conn() does not compile. ThinkingContext exposes State,
 //     Publish, InFlight, Conn() *nats.Conn (the escape hatch for
 //     generic NATS-based clients), Request, and RequestMany.
 //   - RequestOption / RequestManyOption: per-call functional options;
@@ -29,7 +29,7 @@
 // subject permissioning are operator concerns (NATS account configuration
 // and ACLs), not framework code.
 //
-// Reasoning runs concurrently — each Think verdict launches a fresh
+// Thinking runs concurrently — each Think verdict launches a fresh
 // goroutine and dispatch returns immediately.
 //
 // The outbound NATS surface is byte-shaped — Request and RequestMany

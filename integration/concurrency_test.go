@@ -12,7 +12,7 @@ import (
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
-func concurrencySpec(reasoning imps.ReasoningFn) imps.ImpSpec {
+func concurrencySpec(thinking imps.ThinkingFn) imps.ImpSpec {
 	return imps.ImpSpec{
 		Name:    "concurrency",
 		Version: "0.1.0",
@@ -29,7 +29,7 @@ func concurrencySpec(reasoning imps.ReasoningFn) imps.ImpSpec {
 		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Think(decoded, e)
 		},
-		Reasoning: reasoning,
+		Thinking: thinking,
 	}
 }
 
@@ -59,12 +59,12 @@ func freshImp(t *testing.T, spec imps.ImpSpec, opts ...imps.Option) (*imps.Imp, 
 	}
 }
 
-func TestConcurrentReasoningDistinctEntities(t *testing.T) {
+func TestConcurrentThinkingDistinctEntities(t *testing.T) {
 	bothInside := make(chan struct{})
 	release := make(chan struct{})
 
 	var inside atomic.Int32
-	reasoning := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
+	thinking := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error {
 		if inside.Add(1) == 2 {
 			close(bothInside)
 		}
@@ -75,7 +75,7 @@ func TestConcurrentReasoningDistinctEntities(t *testing.T) {
 		return nil
 	}
 
-	imp, nc, cleanup := freshImp(t, concurrencySpec(reasoning))
+	imp, nc, cleanup := freshImp(t, concurrencySpec(thinking))
 	defer cleanup()
 
 	if err := nc.Publish("messages.in", []byte("E1")); err != nil {
@@ -88,21 +88,21 @@ func TestConcurrentReasoningDistinctEntities(t *testing.T) {
 	select {
 	case <-bothInside:
 	case <-time.After(2 * time.Second):
-		t.Fatalf("two reasoning invocations never overlapped (inflight=%d)", imp.Metrics().InflightReasoning)
+		t.Fatalf("two thinking invocations never overlapped (inflight=%d)", imp.Metrics().InflightThinking)
 	}
 
-	if got := imp.Metrics().InflightReasoning; got != 2 {
-		t.Fatalf("expected InflightReasoning=2, got %d", got)
+	if got := imp.Metrics().InflightThinking; got != 2 {
+		t.Fatalf("expected InflightThinking=2, got %d", got)
 	}
 
 	close(release)
 }
 
-func TestAwarenessNotBlockedByHeldReasoning(t *testing.T) {
+func TestAwarenessNotBlockedByHeldThinking(t *testing.T) {
 	release := make(chan struct{})
 	var awarenessLatency atomic.Int64
 
-	reasoning := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
+	thinking := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error {
 		select {
 		case <-release:
 		case <-ctx.Done():
@@ -110,7 +110,7 @@ func TestAwarenessNotBlockedByHeldReasoning(t *testing.T) {
 		return nil
 	}
 
-	spec := concurrencySpec(reasoning)
+	spec := concurrencySpec(thinking)
 	spec.Awareness = func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 		// Record awareness latency for correlation; the test asserts on
 		// the dispatch round-trip below.
@@ -121,7 +121,7 @@ func TestAwarenessNotBlockedByHeldReasoning(t *testing.T) {
 	_, nc, cleanup := freshImp(t, spec)
 	defer cleanup()
 
-	// First message: trips reasoning that will block.
+	// First message: trips thinking that will block.
 	if err := nc.Publish("messages.in", []byte("blocker")); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestAwarenessNotBlockedByHeldReasoning(t *testing.T) {
 	}
 
 	// Now publish a second message and measure the time until the second
-	// awareness runs. A held reasoning must NOT block this.
+	// awareness runs. A held thinking must NOT block this.
 	awarenessLatency.Store(0)
 	publishTime := time.Now()
 	if err := nc.Publish("messages.in", []byte("after")); err != nil {
@@ -152,10 +152,10 @@ func TestAwarenessNotBlockedByHeldReasoning(t *testing.T) {
 	}
 	latency := time.Since(publishTime)
 	if awarenessLatency.Load() == 0 {
-		t.Fatalf("second awareness never fired (reasoning blocked dispatch)")
+		t.Fatalf("second awareness never fired (thinking blocked dispatch)")
 	}
 	if latency > 200*time.Millisecond {
-		t.Fatalf("awareness latency too high under reasoning load: %v", latency)
+		t.Fatalf("awareness latency too high under thinking load: %v", latency)
 	}
 
 	close(release)
@@ -167,15 +167,15 @@ func TestShutdownDrainWindow(t *testing.T) {
 	t.Cleanup(func() { nc.Close() })
 
 	const drain = 200 * time.Millisecond
-	reasoningStart := make(chan struct{}, 4)
-	reasoning := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
-		reasoningStart <- struct{}{}
+	thinkingStart := make(chan struct{}, 4)
+	thinking := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ThinkingContext) error {
+		thinkingStart <- struct{}{}
 		// Block forever; only ctx-cancel can free us.
 		<-ctx.Done()
 		return nil
 	}
 
-	spec := concurrencySpec(reasoning)
+	spec := concurrencySpec(thinking)
 	imp, err := imps.NewImp(spec, nc, imps.WithDrainWindow(drain))
 	if err != nil {
 		t.Fatal(err)
@@ -195,16 +195,16 @@ func TestShutdownDrainWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Wait for both reasonings to start.
+	// Wait for both thinkings to start.
 	for i := 0; i < 2; i++ {
 		select {
-		case <-reasoningStart:
+		case <-thinkingStart:
 		case <-time.After(2 * time.Second):
-			t.Fatalf("reasoning %d never started", i+1)
+			t.Fatalf("thinking %d never started", i+1)
 		}
 	}
 
-	// Now shut down: drain window is 200 ms; reasoning observes ctx-cancel
+	// Now shut down: drain window is 200 ms; thinking observes ctx-cancel
 	// and returns; shutdown returns within drain + ε.
 	t0 := time.Now()
 	cancel()
@@ -215,14 +215,14 @@ func TestShutdownDrainWindow(t *testing.T) {
 	}
 	elapsed := time.Since(t0)
 	// Bound: drain window + 500 ms grace for goroutine scheduling. We
-	// expect well below this since reasoning cooperatively returns on
+	// expect well below this since thinking cooperatively returns on
 	// ctx-cancel.
 	if elapsed > drain+500*time.Millisecond {
 		t.Fatalf("shutdown took %v, expected < %v", elapsed, drain+500*time.Millisecond)
 	}
 }
 
-func TestReasoningPanicIsolation(t *testing.T) {
+func TestThinkingPanicIsolation(t *testing.T) {
 	srv := natstest.New(t)
 	nc, _ := nats.Connect(srv.URL())
 	t.Cleanup(func() { nc.Close() })
@@ -232,7 +232,7 @@ func TestReasoningPanicIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reasoning := func(ctx context.Context, _ any, e imps.Entity, r imps.ReasoningContext) error {
+	thinking := func(ctx context.Context, _ any, e imps.Entity, r imps.ThinkingContext) error {
 		switch e {
 		case "panic":
 			panic("oh no")
@@ -241,7 +241,7 @@ func TestReasoningPanicIsolation(t *testing.T) {
 		}
 	}
 
-	spec := concurrencySpec(reasoning)
+	spec := concurrencySpec(thinking)
 	imp, err := imps.NewImp(spec, nc, imps.WithDrainWindow(2*time.Second))
 	if err != nil {
 		t.Fatal(err)
@@ -282,16 +282,16 @@ func TestReasoningPanicIsolation(t *testing.T) {
 	// Allow inflight gauge to settle.
 	deadline = time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
-		if imp.Metrics().InflightReasoning == 0 {
+		if imp.Metrics().InflightThinking == 0 {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	m := imp.Metrics()
-	if m.ReasoningPanics != 1 {
-		t.Fatalf("expected ReasoningPanics=1, got %d", m.ReasoningPanics)
+	if m.ThinkingPanics != 1 {
+		t.Fatalf("expected ThinkingPanics=1, got %d", m.ThinkingPanics)
 	}
-	if m.InflightReasoning != 0 {
-		t.Fatalf("expected InflightReasoning=0 after settle, got %d", m.InflightReasoning)
+	if m.InflightThinking != 0 {
+		t.Fatalf("expected InflightThinking=0 after settle, got %d", m.InflightThinking)
 	}
 }

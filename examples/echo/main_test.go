@@ -35,7 +35,7 @@ func TestEchoEndToEnd(t *testing.T) {
 		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
+		Thinking: func(ctx context.Context, reason any, _ imps.Entity, r imps.ThinkingContext) error {
 			return r.Publish(ctx, "actions.out", []byte(reason.(string)))
 		},
 	}
