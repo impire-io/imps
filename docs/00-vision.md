@@ -6,7 +6,7 @@
 
 An **imp** is a small, focused, awareness-driven agent. It watches a slice of the world, builds an interpretation of what it sees, and acts when its interpretation crosses a threshold worth acting on. One imp does one thing.
 
-The framework is the **harness** that holds an imp together: a structure for receiving messages, interpreting them cheaply, reasoning about them when reasoning is warranted, and emitting actions. The harness is small. The capabilities the harness can reach for — inference, knowledge, tooling — live outside it as separate services.
+What this framework gives you is the structure an imp is built around: receiving messages, interpreting them cheaply, reasoning about them when reasoning is warranted, and emitting actions. The framework stays small. The capabilities an imp can reach for — inference, knowledge, tooling — live outside it as separate services.
 
 This document records the framing the rest of the design hangs from. Everything else is a consequence of these choices.
 
@@ -20,20 +20,20 @@ A consequence: many imps cooperate to produce outcomes a single imp couldn't. Th
 
 ## The energy gradient is structural
 
-A human brain spends almost no energy on most of what reaches the senses. Attention surfaces things worth thinking about; thinking happens only on the small subset that earned it. This is the principle the harness is built on.
+A human brain spends almost no energy on most of what reaches the senses. Attention surfaces things worth thinking about; thinking happens only on the small subset that earned it. This is the principle the framework is built on.
 
 Inside an imp:
 
 - **Awareness** is cheap. Local interpretation, bounded resource use, deterministic latency. Awareness runs continuously, on every message, and decides whether reasoning is warranted.
 - **Reasoning** is expensive. LLM calls, multi-step tool use, semantic recall over large corpora. Reasoning runs only when awareness escalates.
 
-This isn't a coding convention — it's a structural invariant the harness enforces. Awareness has a tightly-bounded surface for the capabilities it can call (a single embed, a budget-capped classification, a key-only lookup); reasoning has the full surface (agentic loops, semantic search, tool invocation, delegation). A developer cannot accidentally make awareness expensive because the surface for expensive operations isn't available there.
+This isn't a coding convention — it's a structural invariant the framework enforces. Awareness has a tightly-bounded surface for the capabilities it can call (a single embed, a budget-capped classification, a key-only lookup); reasoning has the full surface (agentic loops, semantic search, tool invocation, delegation). A developer cannot accidentally make awareness expensive because the surface for expensive operations isn't available there.
 
-The boundary lives at the harness level, not the implementation level. What awareness *is* is "the part of the imp that runs cheaply on every message." What reasoning *is* is "the part that runs occasionally, and is allowed to do expensive things."
+The boundary lives at the framework level, not the implementation level. What awareness *is* is "the part of the imp that runs cheaply on every message." What reasoning *is* is "the part that runs occasionally, and is allowed to do expensive things."
 
-## The harness is small; capabilities are external
+## The framework is small; capabilities are external
 
-The harness gives an imp:
+The framework gives an imp:
 
 - Channels — how messages reach the imp.
 - Awareness — cheap, local interpretation; decides when reasoning runs.
@@ -43,7 +43,7 @@ The harness gives an imp:
 
 That's the whole vocabulary. Five concepts, each with a small, bounded surface.
 
-What the harness does *not* give an imp:
+What the framework does *not* give an imp:
 
 - Historical knowledge across the colony.
 - Inference (LLM completion, embeddings).
@@ -65,7 +65,7 @@ This split — uniform deployment, capability-specific wire protocol — is what
 
 ## Imps sleep when they're not working
 
-An imp that has nothing to do consumes no compute. The harness uses snapshot-based suspension to preserve an imp's full memory image; NATS holds messages destined for the imp on its subscribed subjects; on arrival, the imp wakes, processes, and goes back to sleep. The imp doesn't know it was asleep. The specific isolation mechanism — microVMs, containers, processes, or in-process simulation — is an infrastructure choice the framework does not dictate; what the framework specifies is the contract that any isolation mechanism satisfies.
+An imp that has nothing to do consumes no compute. The framework uses snapshot-based suspension to preserve an imp's full memory image; NATS holds messages destined for the imp on its subscribed subjects; on arrival, the imp wakes, processes, and goes back to sleep. The imp doesn't know it was asleep. The specific isolation mechanism — microVMs, containers, processes, or in-process simulation — is an infrastructure choice the framework does not dictate; what the framework specifies is the contract that any isolation mechanism satisfies.
 
 Periodic work uses NATS server-side scheduling: the imp registers a recurring schedule on a subject it subscribes to, and the schedule fires whether the imp is currently warm or cold. Schedule TTLs control whether stale ticks accumulate during long sleeps.
 
@@ -98,8 +98,8 @@ Both are deployment configurations of the same capability protocol. An imp disco
 
 Three constraints, in priority order:
 
-1. **Imps stay small and agile.** A 4GB imp is broken. A developer who feels the framework is overdesigned has been failed by it. The harness gets out of the way.
-2. **Specialization composes.** Many small imps cooperating produce outcomes one imp couldn't. The harness makes coordination cheap.
+1. **Imps stay small and agile.** A 4GB imp is broken. A developer who feels the framework is overdesigned has been failed by it. The framework gets out of the way.
+2. **Specialization composes.** Many small imps cooperating produce outcomes one imp couldn't. The framework makes coordination cheap.
 3. **The capability ecosystem is open-ended.** New capabilities slot in without framework changes. The framework defines deployment patterns, not capability implementations.
 
 Where these tensions arise — and they will — the small-and-agile constraint wins. The framework is not the place to solve every problem; it's the place to make solving problems straightforward.
@@ -112,6 +112,6 @@ The framework is not a platform for building one big intelligent thing. It's a s
 
 ---
 
-The rest of the documents in this set work out the consequences. The harness anatomy specifies what awareness and reasoning are, what they can do, and what the boundary between them looks like. The capability service pattern specifies the shared deployment shape. Per-capability specs define their wire protocols. The soulstream document specifies coordination. The developer-surface document specifies what writing an imp actually looks like in code.
+The rest of the documents in this set work out the consequences. The anatomy document specifies what awareness and reasoning are, what they can do, and what the boundary between them looks like. The capability service pattern specifies the shared deployment shape. Per-capability specs define their wire protocols. The soulstream document specifies coordination. The developer-surface document specifies what writing an imp actually looks like in code.
 
 If a future change conflicts with anything in this document, this document is what changes — not silently, not by drift, but explicitly, with the rationale. The vision is the load-bearing layer; everything else is implementation of it.
