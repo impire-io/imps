@@ -1,4 +1,4 @@
-package harness
+package imps
 
 import (
 	"context"
@@ -110,7 +110,7 @@ func (i *Imp) Run(ctx context.Context) error {
 	rt := i.runtime()
 
 	if !rt.state.CompareAndSwap(lifecycle.StateCreated, lifecycle.StateStarting) {
-		return fmt.Errorf("harness: Run already invoked (state %s)", rt.state.Get())
+		return fmt.Errorf("imps: Run already invoked (state %s)", rt.state.Get())
 	}
 
 	if err := i.start(); err != nil {
@@ -245,7 +245,7 @@ func (i *Imp) waitDrain() error {
 		rt.logger.warn("drain deadline exceeded",
 			"pending_reasoning", rt.metrics.InflightReasoning.Load(),
 		)
-		return errors.Join(context.DeadlineExceeded, errors.New("harness: drain window exceeded"))
+		return errors.Join(context.DeadlineExceeded, errors.New("imps: drain window exceeded"))
 	}
 }
 

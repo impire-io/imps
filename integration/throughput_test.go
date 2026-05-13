@@ -9,7 +9,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
@@ -37,24 +37,24 @@ func TestSustainedAwarenessUnderLoad(t *testing.T) {
 	t.Cleanup(func() { close(hold) })
 	var awarenessSeen atomic.Int64
 
-	spec := harness.ImpSpec{
+	spec := imps.ImpSpec{
 		Name:    "stress",
 		Version: "1",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "in",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return string(msg.Data), nil
 			},
-			ExtractEntity: func(decoded any) (harness.Entity, error) {
-				return harness.Entity(decoded.(string)), nil
+			ExtractEntity: func(decoded any) (imps.Entity, error) {
+				return imps.Entity(decoded.(string)), nil
 			},
 		}},
-		Awareness: func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
+		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			awarenessSeen.Add(1)
-			return harness.Wake(decoded, e)
+			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error {
+		Reasoning: func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
 			// Hold every reasoning invocation so it stays in flight while
 			// we drive more awareness through the dispatcher.
 			select {
@@ -65,9 +65,9 @@ func TestSustainedAwarenessUnderLoad(t *testing.T) {
 		},
 	}
 
-	imp, err := harness.NewImp(spec, nc,
+	imp, err := imps.NewImp(spec, nc,
 
-		harness.WithDrainWindow(2*time.Second),
+		imps.WithDrainWindow(2*time.Second),
 	)
 	if err != nil {
 		t.Fatal(err)

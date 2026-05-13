@@ -1,4 +1,4 @@
-package harness
+package imps
 
 import (
 	"context"
@@ -307,8 +307,8 @@ func (i *Imp) dispatchStream(ch *channelState, msg jetstream.Msg) {
 	case verdictNote:
 		i.runtime().metrics.NotesDelivered.Add(1)
 		i.invokeNote(entity, verdict.payload)
-	case verdictWake:
-		i.runtime().metrics.WakesDispatched.Add(1)
+	case verdictThink:
+		i.runtime().metrics.ThinksDispatched.Add(1)
 		i.launchReasoning(verdict.reason, verdict.entity)
 	}
 }

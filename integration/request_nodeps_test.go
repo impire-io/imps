@@ -7,7 +7,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 )
 
 // TestNoRequest_FootprintUnchanged — SC-107. An imp that issues no
@@ -16,27 +16,27 @@ import (
 // 001 counters move per the pre-existing observability contract.
 func TestNoRequest_FootprintUnchanged(t *testing.T) {
 	notes := make(chan struct{}, 8)
-	spec := harness.ImpSpec{
+	spec := imps.ImpSpec{
 		Name:    "no-request",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return msg.Data, nil
 			},
-			ExtractEntity: func(any) (harness.Entity, error) {
-				return harness.Entity("singleton"), nil
+			ExtractEntity: func(any) (imps.Entity, error) {
+				return imps.Entity("singleton"), nil
 			},
 		}},
 		// Awareness always returns Note (delivers to OnNote; no reasoning).
-		Awareness: func(_ context.Context, decoded any, _ harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Note(decoded)
+		Awareness: func(_ context.Context, decoded any, _ imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Note(decoded)
 		},
-		Reasoning: func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error {
+		Reasoning: func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
 			return nil
 		},
-		OnNote: func(_ harness.Entity, _ any) {
+		OnNote: func(_ imps.Entity, _ any) {
 			notes <- struct{}{}
 		},
 	}
@@ -82,12 +82,12 @@ func TestNoRequest_FootprintUnchanged(t *testing.T) {
 	}
 
 	// Existing 001 counters still move as before: each message produced
-	// exactly one Note, no Wake, no decode/extract failure.
+	// exactly one Note, no Think, no decode/extract failure.
 	if got := m.NotesDelivered; got != N {
 		t.Errorf("NotesDelivered = %d, want %d", got, N)
 	}
-	if m.WakesDispatched != 0 {
-		t.Errorf("WakesDispatched = %d, want 0", m.WakesDispatched)
+	if m.ThinksDispatched != 0 {
+		t.Errorf("ThinksDispatched = %d, want 0", m.ThinksDispatched)
 	}
 	if m.DecodeFailures != 0 {
 		t.Errorf("DecodeFailures = %d, want 0", m.DecodeFailures)

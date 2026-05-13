@@ -1,4 +1,4 @@
-package harness
+package imps
 
 import "sync/atomic"
 
@@ -17,7 +17,7 @@ type metrics struct {
 	ReasoningPanics    atomic.Uint64
 	ReasoningErrors    atomic.Uint64
 	NotesDelivered     atomic.Uint64
-	WakesDispatched    atomic.Uint64
+	ThinksDispatched   atomic.Uint64
 	IgnoredVerdicts    atomic.Uint64
 	NakTotal           atomic.Uint64
 
@@ -38,7 +38,7 @@ func (m *metrics) snapshot() Metrics {
 		ReasoningPanics:     m.ReasoningPanics.Load(),
 		ReasoningErrors:     m.ReasoningErrors.Load(),
 		NotesDelivered:      m.NotesDelivered.Load(),
-		WakesDispatched:     m.WakesDispatched.Load(),
+		ThinksDispatched:    m.ThinksDispatched.Load(),
 		IgnoredVerdicts:     m.IgnoredVerdicts.Load(),
 		NakTotal:            m.NakTotal.Load(),
 		RequestCalls:        m.RequestCalls.Load(),

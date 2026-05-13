@@ -9,30 +9,30 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
-func lifecycleSpec(channels []harness.ChannelSpec, reasoning harness.ReasoningFn) harness.ImpSpec {
-	return harness.ImpSpec{
+func lifecycleSpec(channels []imps.ChannelSpec, reasoning imps.ReasoningFn) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:     "lifecycle",
 		Version:  "1.2.3",
 		Channels: channels,
-		Awareness: func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
 		Reasoning: reasoning,
 	}
 }
 
-func subjectChannel(name, subject string) harness.ChannelSpec {
-	return harness.ChannelSpec{
+func subjectChannel(name, subject string) imps.ChannelSpec {
+	return imps.ChannelSpec{
 		Name:   name,
-		Source: harness.SubjectSource{Subject: subject},
-		Decode: func(msg harness.Message) (any, error) {
+		Source: imps.SubjectSource{Subject: subject},
+		Decode: func(msg imps.Message) (any, error) {
 			return string(msg.Data), nil
 		},
-		ExtractEntity: func(any) (harness.Entity, error) { return "singleton", nil },
+		ExtractEntity: func(any) (imps.Entity, error) { return "singleton", nil },
 	}
 }
 
@@ -41,13 +41,13 @@ func TestStartupRegistersSubscriptions(t *testing.T) {
 	nc, _ := nats.Connect(srv.URL())
 	t.Cleanup(func() { nc.Close() })
 
-	channels := []harness.ChannelSpec{
+	channels := []imps.ChannelSpec{
 		subjectChannel("a", "messages.a"),
 		subjectChannel("b", "messages.b"),
 	}
-	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil })
+	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil })
 
-	imp, err := harness.NewImp(spec, nc)
+	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,13 +66,13 @@ func TestStartupRegistersSubscriptions(t *testing.T) {
 	got := make(chan string, 4)
 	for _, ch := range channels {
 		ch := ch
-		if _, err := nc.Subscribe(ch.Source.(harness.SubjectSource).Subject, func(*nats.Msg) {}); err != nil {
+		if _, err := nc.Subscribe(ch.Source.(imps.SubjectSource).Subject, func(*nats.Msg) {}); err != nil {
 			t.Fatal(err)
 		}
 		// publish on the literal subject — if the imp's subscription is up,
 		// dispatch will run; we only care that a publish doesn't silently
 		// disappear.
-		_ = nc.Publish(ch.Source.(harness.SubjectSource).Subject, []byte(ch.Name))
+		_ = nc.Publish(ch.Source.(imps.SubjectSource).Subject, []byte(ch.Name))
 		got <- ch.Name
 	}
 	if err := nc.Flush(); err != nil {
@@ -90,21 +90,21 @@ func TestStartupFailureNoLeaks(t *testing.T) {
 
 	// Channel A: a normal subject channel — establishes successfully.
 	// Channel B: a stream channel referencing a missing stream — fails.
-	channels := []harness.ChannelSpec{
+	channels := []imps.ChannelSpec{
 		subjectChannel("a", "messages.a"),
 		{
 			Name: "b",
-			Source: harness.StreamSource{
+			Source: imps.StreamSource{
 				Stream:        "MISSING_STREAM",
 				FilterSubject: "messages.b",
 			},
-			Decode:        func(harness.Message) (any, error) { return nil, nil },
-			ExtractEntity: func(any) (harness.Entity, error) { return "x", nil },
+			Decode:        func(imps.Message) (any, error) { return nil, nil },
+			ExtractEntity: func(any) (imps.Entity, error) { return "x", nil },
 		},
 	}
-	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil })
+	spec := lifecycleSpec(channels, func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil })
 
-	imp, err := harness.NewImp(spec, nc)
+	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestStartupFailureNoLeaks(t *testing.T) {
 	defer cancel()
 	runErr := imp.Run(ctx)
 
-	var sn *harness.ErrStreamNotFound
+	var sn *imps.ErrStreamNotFound
 	if !errors.As(runErr, &sn) {
 		t.Fatalf("expected ErrStreamNotFound, got %v", runErr)
 	}
@@ -152,14 +152,14 @@ func TestShutdownDrainBoundedReturn(t *testing.T) {
 	subsBefore := nc.NumSubscriptions()
 
 	reasoningStart := make(chan struct{}, 4)
-	reasoning := func(ctx context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error {
+	reasoning := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
 		reasoningStart <- struct{}{}
 		<-ctx.Done()
 		return nil
 	}
 
-	spec := lifecycleSpec([]harness.ChannelSpec{subjectChannel("inbound", "messages.in")}, reasoning)
-	imp, err := harness.NewImp(spec, nc, harness.WithDrainWindow(drain))
+	spec := lifecycleSpec([]imps.ChannelSpec{subjectChannel("inbound", "messages.in")}, reasoning)
+	imp, err := imps.NewImp(spec, nc, imps.WithDrainWindow(drain))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,10 +205,10 @@ func TestIdentityAcrossStates(t *testing.T) {
 	nc, _ := nats.Connect(srv.URL())
 	t.Cleanup(func() { nc.Close() })
 
-	spec := lifecycleSpec([]harness.ChannelSpec{subjectChannel("inbound", "messages.in")},
-		func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil })
+	spec := lifecycleSpec([]imps.ChannelSpec{subjectChannel("inbound", "messages.in")},
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil })
 
-	imp, err := harness.NewImp(spec, nc)
+	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}

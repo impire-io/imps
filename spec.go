@@ -1,4 +1,4 @@
-package harness
+package imps
 
 import "context"
 
@@ -19,7 +19,7 @@ type AwarenessFn func(
 ) Verdict
 
 // ReasoningFn is the expensive-deliberation callback. It is invoked on a
-// fresh goroutine per Wake verdict. The ctx passed is the harness shutdown
+// fresh goroutine per Think verdict. The ctx passed is the harness shutdown
 // context — cancelled when shutdown begins so reasoning can cooperatively
 // exit. A returned error is recorded against ReasoningErrors.
 type ReasoningFn func(
@@ -73,7 +73,7 @@ type Metrics struct {
 	ReasoningPanics    uint64
 	ReasoningErrors    uint64
 	NotesDelivered     uint64
-	WakesDispatched    uint64
+	ThinksDispatched   uint64
 	IgnoredVerdicts    uint64
 	NakTotal           uint64
 

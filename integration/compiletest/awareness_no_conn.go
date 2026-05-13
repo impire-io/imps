@@ -3,7 +3,7 @@
 
 // This file is intentionally NOT included in normal builds. The build tag
 // `awareness_conn_must_fail` activates it; building under that tag MUST
-// fail because harness.AwarenessContext does not expose a Conn method
+// fail because imps.AwarenessContext does not expose a Conn method
 // (the raw-*nats.Conn escape hatch is reasoning-only — SC-104, FR-103b).
 //
 // To run the assertion:
@@ -14,10 +14,10 @@
 package compiletest
 
 import (
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 )
 
-func mustNotCompileConn(a harness.AwarenessContext) {
+func mustNotCompileConn(a imps.AwarenessContext) {
 	// AwarenessContext has no Conn method. This line MUST fail to compile.
 	_ = a.Conn()
 }

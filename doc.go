@@ -1,12 +1,12 @@
-// Package harness is the public, in-process Go substrate that holds an
-// imp together. It exposes a single small surface:
+// Package imps is the Go framework for building an imp. It exposes a
+// single small surface:
 //
 //   - ImpSpec: declarative description of an imp (channels, awareness,
 //     reasoning, local-state shapes, optional Note hook).
 //   - NewImp / Imp.Run / Imp.Shutdown / Imp.Identity / Imp.Ready /
 //     Imp.Metrics: the runtime handle and lifecycle.
 //   - Verdict: closed sum returned by awareness — Ignore, Note(payload),
-//     Wake(reason, entity).
+//     Think(reason, entity).
 //   - AwarenessContext / ReasoningContext: typed surfaces; the energy
 //     gradient is structural — AwarenessContext exposes State and
 //     Request only, so calling awareness.RequestMany(...), Publish(...),
@@ -16,7 +16,7 @@
 //   - RequestOption / RequestManyOption: per-call functional options;
 //     WithRequestTimeout, WithRequestManyWindow, WithRequestManyMax.
 //   - WithDefaultRequestTimeout / WithDefaultRequestManyWindow:
-//     harness-construction options for the request defaults (5s / 1s).
+//     construction options for the request defaults (5s / 1s).
 //   - StateRef: per-entity state slot with Get/Set/Update.
 //   - Typed errors: ErrSpecInvalid, ErrConfigInvalid, ErrStreamNotFound,
 //     ErrConsumerIncompatible, ErrSubscriptionFailed, ErrNoResponders,
@@ -29,12 +29,12 @@
 // subject permissioning are operator concerns (NATS account configuration
 // and ACLs), not framework code.
 //
-// Reasoning runs concurrently — each Wake verdict launches a fresh
+// Reasoning runs concurrently — each Think verdict launches a fresh
 // goroutine and dispatch returns immediately.
 //
 // The outbound NATS surface is byte-shaped — Request and RequestMany
 // take and return []byte. No codec is imposed by the framework. The
-// harness performs no retry, no backoff, and no circuit-breaker: a
+// framework performs no retry, no backoff, and no circuit-breaker: a
 // timeout failure does not produce a second NATS publish on the same
 // subject.
 //
@@ -44,4 +44,4 @@
 // A worked example is in [examples/echo]. The full developer-facing
 // contract lives in [specs/001-harness-core/contracts/public-api.md] and
 // the imp-author walkthrough in [specs/001-harness-core/quickstart.md].
-package harness
+package imps

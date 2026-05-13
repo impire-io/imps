@@ -1,4 +1,4 @@
-package harness
+package imps
 
 import (
 	"bytes"
@@ -65,7 +65,7 @@ func TestSlogEventsEmitted(t *testing.T) {
 			ExtractEntity: func(any) (Entity, error) { return "x", nil },
 		}},
 		Awareness: func(_ context.Context, decoded any, e Entity, _ AwarenessContext) Verdict {
-			return Wake(decoded, e)
+			return Think(decoded, e)
 		},
 		Reasoning: func(ctx context.Context, _ any, _ Entity, r ReasoningContext) error {
 			return r.Publish(ctx, "actions.out", []byte("x"))

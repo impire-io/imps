@@ -1,4 +1,4 @@
-package harness
+package imps
 
 import "fmt"
 
@@ -20,7 +20,7 @@ type ErrUnknownStateShape struct {
 }
 
 func (e *ErrUnknownStateShape) Error() string {
-	return fmt.Sprintf("harness: unknown state shape %q", e.Shape)
+	return fmt.Sprintf("imps: unknown state shape %q", e.Shape)
 }
 
 // ErrCapExceeded is returned by AwarenessContext.State /
@@ -33,5 +33,5 @@ type ErrCapExceeded struct {
 }
 
 func (e *ErrCapExceeded) Error() string {
-	return fmt.Sprintf("harness: state shape %q cap exceeded (%d)", e.Shape, e.Count)
+	return fmt.Sprintf("imps: state shape %q cap exceeded (%d)", e.Shape, e.Count)
 }

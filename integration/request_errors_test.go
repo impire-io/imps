@@ -8,7 +8,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 )
 
 // reasoningCallSpec routes a single Request call through reasoning and
@@ -18,25 +18,25 @@ func reasoningCallSpec(
 	replies chan<- []byte,
 	errs chan<- error,
 	cancelMid bool,
-	reqOpts ...harness.RequestOption,
-) harness.ImpSpec {
-	return harness.ImpSpec{
+	reqOpts ...imps.RequestOption,
+) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "request-errors",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return msg.Data, nil
 			},
-			ExtractEntity: func(any) (harness.Entity, error) {
-				return harness.Entity("singleton"), nil
+			ExtractEntity: func(any) (imps.Entity, error) {
+				return imps.Entity("singleton"), nil
 			},
 		}},
-		Awareness: func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
+		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
 			callCtx := ctx
 			if cancelMid {
 				c, cancel := context.WithCancel(ctx)
@@ -64,7 +64,7 @@ func TestRequest_ErrNoResponders(t *testing.T) {
 
 	imp, nc, cleanup := startBareImp(t, reasoningCallSpec(
 		"nobody.home", replies, errs, false,
-		harness.WithRequestTimeout(2*time.Second),
+		imps.WithRequestTimeout(2*time.Second),
 	))
 	defer cleanup()
 
@@ -88,7 +88,7 @@ func TestRequest_ErrNoResponders(t *testing.T) {
 		t.Fatalf("unexpected reply; expected ErrNoResponders")
 	case err := <-errs:
 		elapsed := time.Since(start)
-		var noResp *harness.ErrNoResponders
+		var noResp *imps.ErrNoResponders
 		if !errors.As(err, &noResp) {
 			t.Fatalf("err = %T %v, want *ErrNoResponders", err, err)
 		}
@@ -121,7 +121,7 @@ func TestRequest_ErrRequestTimeout(t *testing.T) {
 
 	imp, nc, cleanup := startBareImp(t, reasoningCallSpec(
 		"slow", replies, errs, false,
-		harness.WithRequestTimeout(50*time.Millisecond),
+		imps.WithRequestTimeout(50*time.Millisecond),
 	))
 	defer cleanup()
 
@@ -145,7 +145,7 @@ func TestRequest_ErrRequestTimeout(t *testing.T) {
 		t.Fatalf("unexpected reply; expected ErrRequestTimeout")
 	case err := <-errs:
 		elapsed := time.Since(start)
-		var toErr *harness.ErrRequestTimeout
+		var toErr *imps.ErrRequestTimeout
 		if !errors.As(err, &toErr) {
 			t.Fatalf("err = %T %v, want *ErrRequestTimeout", err, err)
 		}
@@ -184,7 +184,7 @@ func TestRequest_CtxCanceled(t *testing.T) {
 
 	_, nc, cleanup := startBareImp(t, reasoningCallSpec(
 		"slowcancel", replies, errs, true,
-		harness.WithRequestTimeout(500*time.Millisecond),
+		imps.WithRequestTimeout(500*time.Millisecond),
 	))
 	defer cleanup()
 
@@ -209,7 +209,7 @@ func TestRequest_CtxCanceled(t *testing.T) {
 		if !errors.Is(err, context.Canceled) {
 			t.Fatalf("errors.Is(err, context.Canceled) = false; want true (err=%v)", err)
 		}
-		var toErr *harness.ErrRequestTimeout
+		var toErr *imps.ErrRequestTimeout
 		if errors.As(err, &toErr) {
 			t.Fatalf("cancellation should not surface as *ErrRequestTimeout (got %v)", toErr)
 		}

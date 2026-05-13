@@ -9,7 +9,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
@@ -21,26 +21,26 @@ func TestEchoEndToEnd(t *testing.T) {
 	}
 	t.Cleanup(func() { nc.Close() })
 
-	spec := harness.ImpSpec{
+	spec := imps.ImpSpec{
 		Name:    "echo",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return string(msg.Data), nil
 			},
-			ExtractEntity: func(any) (harness.Entity, error) { return "singleton", nil },
+			ExtractEntity: func(any) (imps.Entity, error) { return "singleton", nil },
 		}},
-		Awareness: func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
+		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
 			return r.Publish(ctx, "actions.out", []byte(reason.(string)))
 		},
 	}
 
-	imp, err := harness.NewImp(spec, nc)
+	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}

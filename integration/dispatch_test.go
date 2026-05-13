@@ -8,36 +8,36 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
-// echoSpec returns a minimal Wake-always imp that publishes the decoded
+// echoSpec returns a minimal Think-always imp that publishes the decoded
 // payload back out on actions.out. The awareness fn passed in lets each
 // test customize behavior while sharing the rest of the spec.
-func echoSpec(awareness harness.AwarenessFn) harness.ImpSpec {
-	return harness.ImpSpec{
+func echoSpec(awareness imps.AwarenessFn) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "echo",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return string(msg.Data), nil
 			},
-			ExtractEntity: func(decoded any) (harness.Entity, error) {
-				return harness.Entity("singleton"), nil
+			ExtractEntity: func(decoded any) (imps.Entity, error) {
+				return imps.Entity("singleton"), nil
 			},
 		}},
 		Awareness: awareness,
-		Reasoning: func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
+		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
 			payload := []byte(reason.(string))
 			return r.Publish(ctx, "actions.out", payload)
 		},
 	}
 }
 
-func startImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harness.Imp, *nats.Conn, func()) {
+func startImp(t *testing.T, spec imps.ImpSpec, opts ...imps.Option) (*imps.Imp, *nats.Conn, func()) {
 	t.Helper()
 	srv := natstest.New(t)
 	nc, err := nats.Connect(srv.URL())
@@ -46,7 +46,7 @@ func startImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harn
 	}
 	t.Cleanup(func() { nc.Close() })
 
-	imp, err := harness.NewImp(spec, nc, opts...)
+	imp, err := imps.NewImp(spec, nc, opts...)
 	if err != nil {
 		t.Fatalf("NewImp: %v", err)
 	}
@@ -80,8 +80,8 @@ func startImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harn
 
 func TestEndToEndHappyPath(t *testing.T) {
 	imp, nc, cleanup := startImp(t, echoSpec(
-		func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		}))
 	defer cleanup()
 
@@ -107,19 +107,19 @@ func TestEndToEndHappyPath(t *testing.T) {
 	}
 
 	m := imp.Metrics()
-	if m.WakesDispatched == 0 {
-		t.Fatalf("expected WakesDispatched >= 1, got %+v", m)
+	if m.ThinksDispatched == 0 {
+		t.Fatalf("expected ThinksDispatched >= 1, got %+v", m)
 	}
 }
 
 func TestDecodeFailureSkipsAwareness(t *testing.T) {
 	awarenessCalls := 0
 	spec := echoSpec(
-		func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
+		func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			awarenessCalls++
-			return harness.Wake(decoded, e)
+			return imps.Think(decoded, e)
 		})
-	spec.Channels[0].Decode = func(msg harness.Message) (any, error) {
+	spec.Channels[0].Decode = func(msg imps.Message) (any, error) {
 		if string(msg.Data) == "bad" {
 			return nil, errors.New("decode failed")
 		}
@@ -169,15 +169,15 @@ func TestDecodeFailureSkipsAwareness(t *testing.T) {
 func TestExtractionFailureSkipsAwareness(t *testing.T) {
 	awarenessCalls := 0
 	spec := echoSpec(
-		func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
+		func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			awarenessCalls++
-			return harness.Wake(decoded, e)
+			return imps.Think(decoded, e)
 		})
-	spec.Channels[0].ExtractEntity = func(decoded any) (harness.Entity, error) {
+	spec.Channels[0].ExtractEntity = func(decoded any) (imps.Entity, error) {
 		if decoded.(string) == "noentity" {
 			return "", nil
 		}
-		return harness.Entity("singleton"), nil
+		return imps.Entity("singleton"), nil
 	}
 	imp, nc, cleanup := startImp(t, spec)
 	defer cleanup()
@@ -220,12 +220,12 @@ func TestExtractionFailureSkipsAwareness(t *testing.T) {
 
 func TestAwarenessPanicRecovers(t *testing.T) {
 	var awarenessCalls int
-	awareness := func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
+	awareness := func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 		awarenessCalls++
 		if decoded.(string) == "panic" {
 			panic("oh no")
 		}
-		return harness.Wake(decoded, e)
+		return imps.Think(decoded, e)
 	}
 	imp, nc, cleanup := startImp(t, echoSpec(awareness))
 	defer cleanup()
@@ -262,8 +262,8 @@ func TestAwarenessPanicRecovers(t *testing.T) {
 		t.Fatalf("expected 1 awareness panic, got %d", m.AwarenessPanics)
 	}
 	// Reasoning should NOT have run for the panicking message: only one
-	// successful awareness → one Wake → one reasoning invocation.
-	if m.WakesDispatched != 1 {
-		t.Fatalf("expected exactly 1 Wake, got %d", m.WakesDispatched)
+	// successful awareness → one Think → one reasoning invocation.
+	if m.ThinksDispatched != 1 {
+		t.Fatalf("expected exactly 1 Think, got %d", m.ThinksDispatched)
 	}
 }

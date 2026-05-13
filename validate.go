@@ -1,4 +1,4 @@
-package harness
+package imps
 
 // validateSpec runs the construction-time invariants documented on
 // ImpSpec and returns the first violation as a typed error. Callers report
