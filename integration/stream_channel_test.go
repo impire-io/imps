@@ -10,7 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
@@ -40,22 +40,22 @@ func streamSetup(t *testing.T, streamName, source string) (*nats.Conn, jetstream
 	return nc, js
 }
 
-func streamSpec(awareness harness.AwarenessFn, durable string, reasoning harness.ReasoningFn) harness.ImpSpec {
-	return harness.ImpSpec{
+func streamSpec(awareness imps.AwarenessFn, durable string, reasoning imps.ReasoningFn) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "stream-imp",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name: "orders",
-			Source: harness.StreamSource{
+			Source: imps.StreamSource{
 				Stream:        "ORDERS",
 				FilterSubject: "orders.created",
 				Durable:       durable,
 			},
-			Decode: func(msg harness.Message) (any, error) {
+			Decode: func(msg imps.Message) (any, error) {
 				return string(msg.Data), nil
 			},
-			ExtractEntity: func(decoded any) (harness.Entity, error) {
-				return harness.Entity("singleton"), nil
+			ExtractEntity: func(decoded any) (imps.Entity, error) {
+				return imps.Entity("singleton"), nil
 			},
 		}},
 		Awareness: awareness,
@@ -63,13 +63,13 @@ func streamSpec(awareness harness.AwarenessFn, durable string, reasoning harness
 	}
 }
 
-func runStreamImp(t *testing.T, nc *nats.Conn, spec harness.ImpSpec, opts ...harness.Option) (*harness.Imp, func()) {
+func runStreamImp(t *testing.T, nc *nats.Conn, spec imps.ImpSpec, opts ...imps.Option) (*imps.Imp, func()) {
 	t.Helper()
-	defaults := []harness.Option{
+	defaults := []imps.Option{
 
-		harness.WithDrainWindow(1 * time.Second),
+		imps.WithDrainWindow(1 * time.Second),
 	}
-	imp, err := harness.NewImp(spec, nc, append(defaults, opts...)...)
+	imp, err := imps.NewImp(spec, nc, append(defaults, opts...)...)
 	if err != nil {
 		t.Fatalf("NewImp: %v", err)
 	}
@@ -112,11 +112,11 @@ func TestStreamChannelDurableHappyPath(t *testing.T) {
 	}
 
 	spec := streamSpec(
-		func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
 		"echo-orders",
-		func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
+		func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
 			return r.Publish(ctx, "actions.out", []byte(reason.(string)))
 		},
 	)
@@ -166,11 +166,11 @@ func TestEphemeralConsumerLifecycle(t *testing.T) {
 	consumerCountBefore := countConsumers(t, js, "ORDERS")
 
 	spec := streamSpec(
-		func(_ context.Context, _ any, _ harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Ignore()
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Ignore()
 		},
 		"", // ephemeral
-		func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil },
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil },
 	)
 	_, cleanup := runStreamImp(t, nc, spec)
 
@@ -211,14 +211,14 @@ func TestStreamNotFound(t *testing.T) {
 	t.Cleanup(func() { nc.Close() })
 
 	spec := streamSpec(
-		func(_ context.Context, _ any, _ harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Ignore()
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Ignore()
 		},
 		"any",
-		func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil },
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil },
 	)
 
-	imp, err := harness.NewImp(spec, nc)
+	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func TestStreamNotFound(t *testing.T) {
 	defer cancel()
 	runErr := imp.Run(ctx)
 
-	var sn *harness.ErrStreamNotFound
+	var sn *imps.ErrStreamNotFound
 	if !errors.As(runErr, &sn) || sn.Stream != "ORDERS" {
 		t.Fatalf("expected ErrStreamNotFound{ORDERS}, got %v", runErr)
 	}
@@ -248,14 +248,14 @@ func TestConsumerIncompatible(t *testing.T) {
 	}
 
 	spec := streamSpec(
-		func(_ context.Context, _ any, _ harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Ignore()
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Ignore()
 		},
 		"echo-orders",
-		func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil },
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil },
 	)
 
-	imp, err := harness.NewImp(spec, nc)
+	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestConsumerIncompatible(t *testing.T) {
 	defer rcancel()
 	runErr := imp.Run(rctx)
 
-	var ci *harness.ErrConsumerIncompatible
+	var ci *imps.ErrConsumerIncompatible
 	if !errors.As(runErr, &ci) || ci.Consumer != "echo-orders" {
 		t.Fatalf("expected ErrConsumerIncompatible{echo-orders}, got %v", runErr)
 	}
@@ -276,11 +276,11 @@ func TestAckAtAwarenessCompletion(t *testing.T) {
 	nc, js := streamSetup(t, "ORDERS", "orders.created")
 
 	spec := streamSpec(
-		func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
 		"echo-orders",
-		func(ctx context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error {
+		func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
 			// Hold reasoning to prove ack happens BEFORE reasoning completes.
 			select {
 			case <-time.After(500 * time.Millisecond):
@@ -333,39 +333,39 @@ func TestStreamNakOnFailures(t *testing.T) {
 
 	var awarenessCalls atomic.Int32
 	spec := streamSpec(
-		func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
+		func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 			awarenessCalls.Add(1)
 			s, _ := decoded.(string)
 			if s == "panic" {
 				panic("awareness panic")
 			}
-			return harness.Wake(decoded, e)
+			return imps.Think(decoded, e)
 		},
 		"echo-orders",
-		func(ctx context.Context, _ any, _ harness.Entity, r harness.ReasoningContext) error {
+		func(ctx context.Context, _ any, _ imps.Entity, r imps.ReasoningContext) error {
 			return r.Publish(ctx, "actions.out", []byte("ok"))
 		},
 	)
-	spec.Channels[0].Decode = func(msg harness.Message) (any, error) {
+	spec.Channels[0].Decode = func(msg imps.Message) (any, error) {
 		s := string(msg.Data)
 		if s == "decode-fail" {
 			return nil, errors.New("decode failed")
 		}
 		return s, nil
 	}
-	spec.Channels[0].ExtractEntity = func(decoded any) (harness.Entity, error) {
+	spec.Channels[0].ExtractEntity = func(decoded any) (imps.Entity, error) {
 		if decoded.(string) == "extract-fail" {
 			return "", nil
 		}
-		return harness.Entity("singleton"), nil
+		return imps.Entity("singleton"), nil
 	}
 	// MaxDeliver=1 so each NAK does NOT trigger an infinite redelivery
 	// loop and we can finish the test.
-	spec.Channels[0].Source = harness.StreamSource{
+	spec.Channels[0].Source = imps.StreamSource{
 		Stream:        "ORDERS",
 		FilterSubject: "orders.created",
 		Durable:       "echo-orders",
-		ConsumerConfig: harness.ConsumerConfig{
+		ConsumerConfig: imps.ConsumerConfig{
 			MaxDeliver: 1,
 		},
 	}

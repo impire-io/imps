@@ -10,7 +10,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 )
 
 // reasoningManySpec builds an imp whose reasoning calls
@@ -23,25 +23,25 @@ func reasoningManySpec(
 	replies chan<- [][]byte,
 	errs chan<- error,
 	alsoPublishSubject string,
-	manyOpts ...harness.RequestManyOption,
-) harness.ImpSpec {
-	return harness.ImpSpec{
+	manyOpts ...imps.RequestManyOption,
+) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "request-many",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return msg.Data, nil
 			},
-			ExtractEntity: func(any) (harness.Entity, error) {
-				return harness.Entity("singleton"), nil
+			ExtractEntity: func(any) (imps.Entity, error) {
+				return imps.Entity("singleton"), nil
 			},
 		}},
-		Awareness: func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
+		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
 			got, err := r.RequestMany(ctx, subject, reason.([]byte), manyOpts...)
 			if err != nil {
 				errs <- err
@@ -65,7 +65,7 @@ func TestReasoning_HasFullSurface(t *testing.T) {
 
 	imp, nc, cleanup := startBareImp(t, reasoningManySpec(
 		"health.ping", replies, errs, "actions.out",
-		harness.WithRequestManyWindow(200*time.Millisecond),
+		imps.WithRequestManyWindow(200*time.Millisecond),
 	))
 	defer cleanup()
 
@@ -113,7 +113,7 @@ func TestRequestMany_HappyPath(t *testing.T) {
 
 	imp, nc, cleanup := startBareImp(t, reasoningManySpec(
 		"health.ping", replies, errs, "",
-		harness.WithRequestManyWindow(200*time.Millisecond),
+		imps.WithRequestManyWindow(200*time.Millisecond),
 	))
 	defer cleanup()
 
@@ -184,8 +184,8 @@ func TestRequestMany_MaxCapEarlyExit(t *testing.T) {
 
 	_, nc, cleanup := startBareImp(t, reasoningManySpec(
 		"health.fanout", replies, errs, "",
-		harness.WithRequestManyWindow(500*time.Millisecond),
-		harness.WithRequestManyMax(3),
+		imps.WithRequestManyWindow(500*time.Millisecond),
+		imps.WithRequestManyMax(3),
 	))
 	defer cleanup()
 
@@ -230,7 +230,7 @@ func TestRequestMany_WindowElapseNoResponders(t *testing.T) {
 
 	_, nc, cleanup := startBareImp(t, reasoningManySpec(
 		"health.empty", replies, errs, "",
-		harness.WithRequestManyWindow(100*time.Millisecond),
+		imps.WithRequestManyWindow(100*time.Millisecond),
 	))
 	defer cleanup()
 
@@ -284,23 +284,23 @@ func TestRequestMany_InboxCleanup(t *testing.T) {
 	errs := make(chan error, 4)
 
 	var driven atomic.Int32
-	spec := harness.ImpSpec{
+	spec := imps.ImpSpec{
 		Name:    "inbox-cleanup",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "cleanup.in"},
-			Decode: func(msg harness.Message) (any, error) { return msg.Data, nil },
-			ExtractEntity: func(any) (harness.Entity, error) {
-				return harness.Entity(strconv.Itoa(int(driven.Add(1)))), nil
+			Source: imps.SubjectSource{Subject: "cleanup.in"},
+			Decode: func(msg imps.Message) (any, error) { return msg.Data, nil },
+			ExtractEntity: func(any) (imps.Entity, error) {
+				return imps.Entity(strconv.Itoa(int(driven.Add(1)))), nil
 			},
 		}},
-		Awareness: func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, _ any, _ harness.Entity, r harness.ReasoningContext) error {
+		Reasoning: func(ctx context.Context, _ any, _ imps.Entity, r imps.ReasoningContext) error {
 			got, err := r.RequestMany(ctx, "cleanup.out", nil,
-				harness.WithRequestManyWindow(60*time.Millisecond),
+				imps.WithRequestManyWindow(60*time.Millisecond),
 			)
 			if err != nil {
 				errs <- err
@@ -359,7 +359,7 @@ func TestSubjectsAreLiteral_RequestMany_Publish(t *testing.T) {
 
 	_, nc, cleanup := startBareImp(t, reasoningManySpec(
 		"health.ping", replies, errs, "actions.out",
-		harness.WithRequestManyWindow(200*time.Millisecond),
+		imps.WithRequestManyWindow(200*time.Millisecond),
 	))
 	defer cleanup()
 

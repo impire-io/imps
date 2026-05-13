@@ -1,4 +1,4 @@
-package harness
+package imps
 
 // invokeNote calls the user's OnNote hook (if registered) under a panic
 // guard. A nil OnNote drops the payload; a panicking OnNote is treated as

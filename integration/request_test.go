@@ -8,14 +8,14 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
 // startBareImp starts an imp without injecting a default channel. Tests
 // that drive Request/RequestMany from awareness or reasoning need full
 // control over the imp's ChannelSpec.
-func startBareImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harness.Imp, *nats.Conn, func()) {
+func startBareImp(t *testing.T, spec imps.ImpSpec, opts ...imps.Option) (*imps.Imp, *nats.Conn, func()) {
 	t.Helper()
 	srv := natstest.New(t)
 	nc, err := nats.Connect(srv.URL())
@@ -24,7 +24,7 @@ func startBareImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*
 	}
 	t.Cleanup(func() { nc.Close() })
 
-	imp, err := harness.NewImp(spec, nc, opts...)
+	imp, err := imps.NewImp(spec, nc, opts...)
 	if err != nil {
 		t.Fatalf("NewImp: %v", err)
 	}
@@ -55,24 +55,24 @@ func startBareImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*
 // reasoningRequestSpec builds an imp whose reasoning calls r.Request on
 // the given subject with the decoded payload and publishes the reply on
 // "actions.out". The supplied reqOpts are forwarded to the Request call.
-func reasoningRequestSpec(subject string, reqOpts ...harness.RequestOption) harness.ImpSpec {
-	return harness.ImpSpec{
+func reasoningRequestSpec(subject string, reqOpts ...imps.RequestOption) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "request-reasoning",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return msg.Data, nil
 			},
-			ExtractEntity: func(any) (harness.Entity, error) {
-				return harness.Entity("singleton"), nil
+			ExtractEntity: func(any) (imps.Entity, error) {
+				return imps.Entity("singleton"), nil
 			},
 		}},
-		Awareness: func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
+		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
 			reply, err := r.Request(ctx, subject, reason.([]byte), reqOpts...)
 			if err != nil {
 				return r.Publish(ctx, "actions.err", []byte(err.Error()))
@@ -133,7 +133,7 @@ func TestRequest_Reasoning_HappyPath(t *testing.T) {
 // live in TestRequest_ErrRequestTimeout under US-5 / US-6.)
 func TestRequest_Reasoning_PerCallTimeoutHonored(t *testing.T) {
 	imp, nc, cleanup := startBareImp(t,
-		reasoningRequestSpec("knowledge.recall", harness.WithRequestTimeout(50*time.Millisecond)),
+		reasoningRequestSpec("knowledge.recall", imps.WithRequestTimeout(50*time.Millisecond)),
 	)
 	defer cleanup()
 
@@ -193,56 +193,56 @@ func TestRequest_Reasoning_PerCallTimeoutHonored(t *testing.T) {
 func awarenessRequestSpec(
 	subject string,
 	notes chan<- any,
-	reqOpts ...harness.RequestOption,
-) harness.ImpSpec {
-	return harness.ImpSpec{
+	reqOpts ...imps.RequestOption,
+) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "request-awareness",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return msg.Data, nil
 			},
-			ExtractEntity: func(any) (harness.Entity, error) {
-				return harness.Entity("singleton"), nil
+			ExtractEntity: func(any) (imps.Entity, error) {
+				return imps.Entity("singleton"), nil
 			},
 		}},
-		Awareness: func(ctx context.Context, decoded any, e harness.Entity, a harness.AwarenessContext) harness.Verdict {
+		Awareness: func(ctx context.Context, decoded any, e imps.Entity, a imps.AwarenessContext) imps.Verdict {
 			reply, err := a.Request(ctx, subject, decoded.([]byte), reqOpts...)
 			if err != nil {
-				var toErr *harness.ErrRequestTimeout
-				var noResp *harness.ErrNoResponders
+				var toErr *imps.ErrRequestTimeout
+				var noResp *imps.ErrNoResponders
 				switch {
 				case errors.As(err, &toErr):
-					return harness.Note("timeout:" + toErr.Subject)
+					return imps.Note("timeout:" + toErr.Subject)
 				case errors.As(err, &noResp):
-					return harness.Note("no_responders:" + noResp.Subject)
+					return imps.Note("no_responders:" + noResp.Subject)
 				default:
-					return harness.Note("err:" + err.Error())
+					return imps.Note("err:" + err.Error())
 				}
 			}
 			if string(reply) == "ignore" {
-				return harness.Ignore()
+				return imps.Ignore()
 			}
-			return harness.Wake(reply, e)
+			return imps.Think(reply, e)
 		},
-		Reasoning: func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error {
+		Reasoning: func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
 			return nil
 		},
-		OnNote: func(_ harness.Entity, payload any) {
+		OnNote: func(_ imps.Entity, payload any) {
 			notes <- payload
 		},
 	}
 }
 
 // TestRequest_Awareness_HappyPath — US-3 AS-1: a.Request reply drives the
-// verdict; the deterministic transformer's reply chooses Wake vs Ignore.
+// verdict; the deterministic transformer's reply chooses Think vs Ignore.
 func TestRequest_Awareness_HappyPath(t *testing.T) {
 	notes := make(chan any, 4)
 	imp, nc, cleanup := startBareImp(t, awarenessRequestSpec(
 		"embed.short", notes,
-		harness.WithRequestTimeout(200*time.Millisecond),
+		imps.WithRequestTimeout(200*time.Millisecond),
 	))
 	defer cleanup()
 
@@ -261,14 +261,14 @@ func TestRequest_Awareness_HappyPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Even length → Ignore → no Note delivered. Odd length → Wake.
+	// Even length → Ignore → no Note delivered. Odd length → Think.
 	if err := nc.Publish("messages.in", []byte("abc")); err != nil {
 		t.Fatal(err)
 	}
 
 	select {
 	case <-notes:
-		// awareness returned Wake, but Wake does not deliver to OnNote;
+		// awareness returned Think, but Think does not deliver to OnNote;
 		// the only way a note arrives is the error path. Fail loudly.
 		t.Fatalf("unexpected note for wake verdict; metrics=%+v", imp.Metrics())
 	case <-time.After(300 * time.Millisecond):
@@ -294,7 +294,7 @@ func TestRequest_Awareness_TimeoutInVerdict(t *testing.T) {
 	notes := make(chan any, 4)
 	imp, nc, cleanup := startBareImp(t, awarenessRequestSpec(
 		"embed.short", notes,
-		harness.WithRequestTimeout(50*time.Millisecond),
+		imps.WithRequestTimeout(50*time.Millisecond),
 	))
 	defer cleanup()
 
@@ -373,7 +373,7 @@ func TestSubjectsAreLiteral_Request(t *testing.T) {
 		errs := make(chan error, 1)
 		_, nc, cleanup := startBareImp(t, reasoningCallSpec(
 			"knowledge.recall", replies, errs, false,
-			harness.WithRequestTimeout(500*time.Millisecond),
+			imps.WithRequestTimeout(500*time.Millisecond),
 		))
 		defer cleanup()
 		if _, err := nc.Subscribe("unrelated", func(_ *nats.Msg) {}); err != nil {
@@ -387,7 +387,7 @@ func TestSubjectsAreLiteral_Request(t *testing.T) {
 		}
 		select {
 		case err := <-errs:
-			var noResp *harness.ErrNoResponders
+			var noResp *imps.ErrNoResponders
 			if !errors.As(err, &noResp) {
 				t.Fatalf("err = %T %v, want *ErrNoResponders", err, err)
 			}
@@ -404,7 +404,7 @@ func TestSubjectsAreLiteral_Request(t *testing.T) {
 		notes := make(chan any, 1)
 		_, nc, cleanup := startBareImp(t, awarenessRequestSpec(
 			"embed.short", notes,
-			harness.WithRequestTimeout(500*time.Millisecond),
+			imps.WithRequestTimeout(500*time.Millisecond),
 		))
 		defer cleanup()
 

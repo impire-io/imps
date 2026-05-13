@@ -1,4 +1,4 @@
-package harness
+package imps
 
 import (
 	"context"
@@ -42,11 +42,11 @@ func BenchmarkDispatchOverhead(b *testing.B) {
 	}
 }
 
-// BenchmarkDispatchWakeReturns measures dispatch return latency when the
-// verdict is Wake. Reasoning blocks until released; the benchmark exits
+// BenchmarkDispatchThinkReturns measures dispatch return latency when the
+// verdict is Think. Reasoning blocks until released; the benchmark exits
 // far before that — proving dispatch returns regardless of reasoning
 // latency (FR-016, FR-020).
-func BenchmarkDispatchWakeReturns(b *testing.B) {
+func BenchmarkDispatchThinkReturns(b *testing.B) {
 	imp, ch, release := dispatchBenchSetup(b, 0, 1)
 	defer release()
 	b.ResetTimer()
@@ -83,7 +83,7 @@ func dispatchBenchSetup(b *testing.B, preheatInflight, entityCap int) (*Imp, *ch
 			},
 		}},
 		Awareness: func(_ context.Context, _ any, e Entity, _ AwarenessContext) Verdict {
-			return Wake("bench", e)
+			return Think("bench", e)
 		},
 		Reasoning: func(ctx context.Context, _ any, _ Entity, _ ReasoningContext) error {
 			select {

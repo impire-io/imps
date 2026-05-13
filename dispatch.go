@@ -1,4 +1,4 @@
-package harness
+package imps
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 // caller's job (subject channels have no ack; stream channels ack/NAK
 // outside this function based on the dispatchOutcome we return).
 //
-// The dispatch path returns BEFORE reasoning runs — Wake schedules
+// The dispatch path returns BEFORE reasoning runs — Think schedules
 // reasoning on a fresh goroutine via launchReasoning and returns
 // immediately. This is the energy gradient enforced at the call site.
 type dispatchOutcome int
@@ -58,8 +58,8 @@ func (i *Imp) dispatch(ctx context.Context, ch *channelState, msg Message) dispa
 	case verdictNote:
 		i.runtime().metrics.NotesDelivered.Add(1)
 		i.invokeNote(entity, verdict.payload)
-	case verdictWake:
-		i.runtime().metrics.WakesDispatched.Add(1)
+	case verdictThink:
+		i.runtime().metrics.ThinksDispatched.Add(1)
 		i.launchReasoning(verdict.reason, verdict.entity)
 	}
 	return dispatchOK

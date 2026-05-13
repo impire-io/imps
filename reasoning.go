@@ -1,4 +1,4 @@
-package harness
+package imps
 
 // launchReasoning runs the user's reasoning function in a fresh goroutine.
 // The InflightReasoning gauge is incremented before the goroutine starts

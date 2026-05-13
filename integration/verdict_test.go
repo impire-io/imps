@@ -8,29 +8,29 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
 // noteSpec returns an imp with a configurable awareness function and a
 // recording OnNote hook. Reasoning publishes "reasoned" so tests can
 // observe whether reasoning ran.
-func noteSpec(awareness harness.AwarenessFn, onNote func(harness.Entity, any)) harness.ImpSpec {
-	return harness.ImpSpec{
+func noteSpec(awareness imps.AwarenessFn, onNote func(imps.Entity, any)) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "verdict-test",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return string(msg.Data), nil
 			},
-			ExtractEntity: func(decoded any) (harness.Entity, error) {
-				return harness.Entity("singleton"), nil
+			ExtractEntity: func(decoded any) (imps.Entity, error) {
+				return imps.Entity("singleton"), nil
 			},
 		}},
 		Awareness: awareness,
-		Reasoning: func(ctx context.Context, _ any, _ harness.Entity, r harness.ReasoningContext) error {
+		Reasoning: func(ctx context.Context, _ any, _ imps.Entity, r imps.ReasoningContext) error {
 			return r.Publish(ctx, "actions.out", []byte("reasoned"))
 		},
 		OnNote: onNote,
@@ -44,13 +44,13 @@ func TestIgnoreVerdict(t *testing.T) {
 
 	notes := make(chan any, 4)
 	spec := noteSpec(
-		func(_ context.Context, _ any, _ harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Ignore()
+		func(_ context.Context, _ any, _ imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Ignore()
 		},
-		func(_ harness.Entity, p any) { notes <- p },
+		func(_ imps.Entity, p any) { notes <- p },
 	)
 
-	imp, err := harness.NewImp(spec, nc)
+	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestIgnoreVerdict(t *testing.T) {
 	if m.IgnoredVerdicts == 0 {
 		t.Fatalf("expected IgnoredVerdicts >= 1, got %+v", m)
 	}
-	if m.WakesDispatched != 0 || m.NotesDelivered != 0 {
+	if m.ThinksDispatched != 0 || m.NotesDelivered != 0 {
 		t.Fatalf("unexpected counters: %+v", m)
 	}
 }
@@ -101,13 +101,13 @@ func TestNoteVerdict(t *testing.T) {
 
 	gotNote := make(chan any, 1)
 	spec := noteSpec(
-		func(_ context.Context, decoded any, _ harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Note(decoded)
+		func(_ context.Context, decoded any, _ imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Note(decoded)
 		},
-		func(_ harness.Entity, p any) { gotNote <- p },
+		func(_ imps.Entity, p any) { gotNote <- p },
 	)
 
-	imp, err := harness.NewImp(spec, nc)
+	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,12 +149,12 @@ func TestNoteVerdict(t *testing.T) {
 	if m.NotesDelivered == 0 {
 		t.Fatalf("expected NotesDelivered >= 1, got %+v", m)
 	}
-	if m.WakesDispatched != 0 {
-		t.Fatalf("Note must not increment WakesDispatched: %+v", m)
+	if m.ThinksDispatched != 0 {
+		t.Fatalf("Note must not increment ThinksDispatched: %+v", m)
 	}
 }
 
-func TestWakeVerdictAsync(t *testing.T) {
+func TestThinkVerdictAsync(t *testing.T) {
 	srv := natstest.New(t)
 	nc, _ := nats.Connect(srv.URL())
 	t.Cleanup(func() { nc.Close() })
@@ -163,21 +163,21 @@ func TestWakeVerdictAsync(t *testing.T) {
 	releaseReasoning := make(chan struct{})
 
 	var dispatched atomic.Bool
-	awareness := func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
+	awareness := func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 		// dispatched is set to true when awareness is RETURNING — proves
 		// dispatch did not block on reasoning.
 		defer dispatched.Store(true)
-		return harness.Wake(decoded, e)
+		return imps.Think(decoded, e)
 	}
 
 	spec := noteSpec(awareness, nil)
-	spec.Reasoning = func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
+	spec.Reasoning = func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
 		close(reasoningStarted)
 		<-releaseReasoning
 		return r.Publish(ctx, "actions.out", []byte(reason.(string)))
 	}
 
-	imp, err := harness.NewImp(spec, nc)
+	imp, err := imps.NewImp(spec, nc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestWakeVerdictAsync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Reasoning must start (proves Wake queued it) but dispatch returns
+	// Reasoning must start (proves Think queued it) but dispatch returns
 	// before reasoning completes (we never released it).
 	select {
 	case <-reasoningStarted:
@@ -206,15 +206,15 @@ func TestWakeVerdictAsync(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	m := imp.Metrics()
-	if m.WakesDispatched == 0 {
-		t.Fatalf("expected WakesDispatched >= 1, got %+v", m)
+	if m.ThinksDispatched == 0 {
+		t.Fatalf("expected ThinksDispatched >= 1, got %+v", m)
 	}
 }
 
 // waitReady polls until Imp.Ready() returns true (Run has installed
 // the runtime and registered subscriptions). Helps avoid races between
 // Run's startup and publishes from the test.
-func waitReady(t *testing.T, imp *harness.Imp) {
+func waitReady(t *testing.T, imp *imps.Imp) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {

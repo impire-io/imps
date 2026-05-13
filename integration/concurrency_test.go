@@ -8,32 +8,32 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
-func concurrencySpec(reasoning harness.ReasoningFn) harness.ImpSpec {
-	return harness.ImpSpec{
+func concurrencySpec(reasoning imps.ReasoningFn) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "concurrency",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return string(msg.Data), nil
 			},
-			ExtractEntity: func(decoded any) (harness.Entity, error) {
-				return harness.Entity(decoded.(string)), nil
+			ExtractEntity: func(decoded any) (imps.Entity, error) {
+				return imps.Entity(decoded.(string)), nil
 			},
 		}},
-		Awareness: func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
 		Reasoning: reasoning,
 	}
 }
 
-func freshImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harness.Imp, *nats.Conn, func()) {
+func freshImp(t *testing.T, spec imps.ImpSpec, opts ...imps.Option) (*imps.Imp, *nats.Conn, func()) {
 	t.Helper()
 	srv := natstest.New(t)
 	nc, err := nats.Connect(srv.URL())
@@ -41,8 +41,8 @@ func freshImp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harn
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { nc.Close() })
-	defaults := []harness.Option{harness.WithDrainWindow(2 * time.Second)}
-	imp, err := harness.NewImp(spec, nc, append(defaults, opts...)...)
+	defaults := []imps.Option{imps.WithDrainWindow(2 * time.Second)}
+	imp, err := imps.NewImp(spec, nc, append(defaults, opts...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestConcurrentReasoningDistinctEntities(t *testing.T) {
 	release := make(chan struct{})
 
 	var inside atomic.Int32
-	reasoning := func(ctx context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error {
+	reasoning := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
 		if inside.Add(1) == 2 {
 			close(bothInside)
 		}
@@ -102,7 +102,7 @@ func TestAwarenessNotBlockedByHeldReasoning(t *testing.T) {
 	release := make(chan struct{})
 	var awarenessLatency atomic.Int64
 
-	reasoning := func(ctx context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error {
+	reasoning := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
 		select {
 		case <-release:
 		case <-ctx.Done():
@@ -111,11 +111,11 @@ func TestAwarenessNotBlockedByHeldReasoning(t *testing.T) {
 	}
 
 	spec := concurrencySpec(reasoning)
-	spec.Awareness = func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
+	spec.Awareness = func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
 		// Record awareness latency for correlation; the test asserts on
 		// the dispatch round-trip below.
 		awarenessLatency.Store(time.Now().UnixNano())
-		return harness.Wake(decoded, e)
+		return imps.Think(decoded, e)
 	}
 
 	_, nc, cleanup := freshImp(t, spec)
@@ -168,7 +168,7 @@ func TestShutdownDrainWindow(t *testing.T) {
 
 	const drain = 200 * time.Millisecond
 	reasoningStart := make(chan struct{}, 4)
-	reasoning := func(ctx context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error {
+	reasoning := func(ctx context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error {
 		reasoningStart <- struct{}{}
 		// Block forever; only ctx-cancel can free us.
 		<-ctx.Done()
@@ -176,7 +176,7 @@ func TestShutdownDrainWindow(t *testing.T) {
 	}
 
 	spec := concurrencySpec(reasoning)
-	imp, err := harness.NewImp(spec, nc, harness.WithDrainWindow(drain))
+	imp, err := imps.NewImp(spec, nc, imps.WithDrainWindow(drain))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestReasoningPanicIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reasoning := func(ctx context.Context, _ any, e harness.Entity, r harness.ReasoningContext) error {
+	reasoning := func(ctx context.Context, _ any, e imps.Entity, r imps.ReasoningContext) error {
 		switch e {
 		case "panic":
 			panic("oh no")
@@ -242,7 +242,7 @@ func TestReasoningPanicIsolation(t *testing.T) {
 	}
 
 	spec := concurrencySpec(reasoning)
-	imp, err := harness.NewImp(spec, nc, harness.WithDrainWindow(2*time.Second))
+	imp, err := imps.NewImp(spec, nc, imps.WithDrainWindow(2*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}

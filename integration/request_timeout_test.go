@@ -9,7 +9,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 )
 
 // twoCallReasoningSpec drives two Request calls per reasoning invocation:
@@ -20,24 +20,24 @@ func twoCallReasoningSpec(
 	perCallTO time.Duration,
 	fastReplies chan<- []byte,
 	slowErrs chan<- error,
-) harness.ImpSpec {
-	return harness.ImpSpec{
+) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "request-timeout",
 		Version: "0.1.0",
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return msg.Data, nil
 			},
-			ExtractEntity: func(any) (harness.Entity, error) {
-				return harness.Entity("singleton"), nil
+			ExtractEntity: func(any) (imps.Entity, error) {
+				return imps.Entity("singleton"), nil
 			},
 		}},
-		Awareness: func(_ context.Context, decoded any, e harness.Entity, _ harness.AwarenessContext) harness.Verdict {
-			return harness.Wake(decoded, e)
+		Awareness: func(_ context.Context, decoded any, e imps.Entity, _ imps.AwarenessContext) imps.Verdict {
+			return imps.Think(decoded, e)
 		},
-		Reasoning: func(ctx context.Context, reason any, _ harness.Entity, r harness.ReasoningContext) error {
+		Reasoning: func(ctx context.Context, reason any, _ imps.Entity, r imps.ReasoningContext) error {
 			reply, err := r.Request(ctx, fastSubject, reason.([]byte))
 			if err != nil {
 				slowErrs <- err
@@ -46,7 +46,7 @@ func twoCallReasoningSpec(
 			fastReplies <- reply
 
 			_, err = r.Request(ctx, slowSubject, reason.([]byte),
-				harness.WithRequestTimeout(perCallTO),
+				imps.WithRequestTimeout(perCallTO),
 			)
 			slowErrs <- err
 			return nil
@@ -63,7 +63,7 @@ func TestRequest_PerCallTimeoutPrecedence(t *testing.T) {
 		"fast", "slow", 5*time.Millisecond,
 		fastReplies, slowErrs,
 	),
-		harness.WithDefaultRequestTimeout(time.Second),
+		imps.WithDefaultRequestTimeout(time.Second),
 	)
 	defer cleanup()
 
@@ -98,7 +98,7 @@ func TestRequest_PerCallTimeoutPrecedence(t *testing.T) {
 
 	select {
 	case err := <-slowErrs:
-		var toErr *harness.ErrRequestTimeout
+		var toErr *imps.ErrRequestTimeout
 		if !errors.As(err, &toErr) {
 			t.Fatalf("slow err = %T %v, want *ErrRequestTimeout", err, err)
 		}
@@ -119,7 +119,7 @@ func TestRequest_NoRetryOnTimeout(t *testing.T) {
 
 	_, nc, cleanup := startBareImp(t, reasoningCallSpec(
 		"count.me", replies, errs, false,
-		harness.WithRequestTimeout(50*time.Millisecond),
+		imps.WithRequestTimeout(50*time.Millisecond),
 	))
 	defer cleanup()
 
@@ -141,7 +141,7 @@ func TestRequest_NoRetryOnTimeout(t *testing.T) {
 
 	select {
 	case err := <-errs:
-		var toErr *harness.ErrRequestTimeout
+		var toErr *imps.ErrRequestTimeout
 		if !errors.As(err, &toErr) {
 			t.Fatalf("err = %T %v, want *ErrRequestTimeout", err, err)
 		}
@@ -169,10 +169,10 @@ func TestRequestMany_PerCallWindowAndMax(t *testing.T) {
 
 	_, nc, cleanup := startBareImp(t, reasoningManySpec(
 		"override.fanout", replies, errs, "",
-		harness.WithRequestManyWindow(300*time.Millisecond),
-		harness.WithRequestManyMax(2),
+		imps.WithRequestManyWindow(300*time.Millisecond),
+		imps.WithRequestManyMax(2),
 	),
-		harness.WithDefaultRequestManyWindow(50*time.Millisecond),
+		imps.WithDefaultRequestManyWindow(50*time.Millisecond),
 	)
 	defer cleanup()
 

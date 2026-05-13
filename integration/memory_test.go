@@ -11,7 +11,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/impire-io/imps/harness"
+	"github.com/impire-io/imps"
 	"github.com/impire-io/imps/testutil/natstest"
 )
 
@@ -21,32 +21,32 @@ type counter struct{ n int }
 // given cap. The awareness function is supplied by the test so each
 // scenario can probe state behavior without being tangled in stream/sub
 // plumbing.
-func memorySpec(cap int, awareness harness.AwarenessFn, onNote func(harness.Entity, any)) harness.ImpSpec {
-	return harness.ImpSpec{
+func memorySpec(cap int, awareness imps.AwarenessFn, onNote func(imps.Entity, any)) imps.ImpSpec {
+	return imps.ImpSpec{
 		Name:    "memory-test",
 		Version: "0.1.0",
-		States: []harness.StateShape{{
+		States: []imps.StateShape{{
 			Name:    "counter",
 			Factory: func() any { return &counter{} },
 			Cap:     cap,
 		}},
-		Channels: []harness.ChannelSpec{{
+		Channels: []imps.ChannelSpec{{
 			Name:   "inbound",
-			Source: harness.SubjectSource{Subject: "messages.in"},
-			Decode: func(msg harness.Message) (any, error) {
+			Source: imps.SubjectSource{Subject: "messages.in"},
+			Decode: func(msg imps.Message) (any, error) {
 				return string(msg.Data), nil
 			},
-			ExtractEntity: func(decoded any) (harness.Entity, error) {
-				return harness.Entity(decoded.(string)), nil
+			ExtractEntity: func(decoded any) (imps.Entity, error) {
+				return imps.Entity(decoded.(string)), nil
 			},
 		}},
 		Awareness: awareness,
-		Reasoning: func(_ context.Context, _ any, _ harness.Entity, _ harness.ReasoningContext) error { return nil },
+		Reasoning: func(_ context.Context, _ any, _ imps.Entity, _ imps.ReasoningContext) error { return nil },
 		OnNote:    onNote,
 	}
 }
 
-func bringUp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harness.Imp, *nats.Conn, func()) {
+func bringUp(t *testing.T, spec imps.ImpSpec, opts ...imps.Option) (*imps.Imp, *nats.Conn, func()) {
 	t.Helper()
 	srv := natstest.New(t)
 	nc, err := nats.Connect(srv.URL())
@@ -54,8 +54,8 @@ func bringUp(t *testing.T, spec harness.ImpSpec, opts ...harness.Option) (*harne
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { nc.Close() })
-	defaults := []harness.Option{harness.WithDrainWindow(1 * time.Second)}
-	imp, err := harness.NewImp(spec, nc, append(defaults, opts...)...)
+	defaults := []imps.Option{imps.WithDrainWindow(1 * time.Second)}
+	imp, err := imps.NewImp(spec, nc, append(defaults, opts...)...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,10 +76,10 @@ func TestPerEntityStateConsistency(t *testing.T) {
 	const N = 5
 	counters := sync.Map{}
 
-	awareness := func(_ context.Context, _ any, e harness.Entity, a harness.AwarenessContext) harness.Verdict {
+	awareness := func(_ context.Context, _ any, e imps.Entity, a imps.AwarenessContext) imps.Verdict {
 		ref, err := a.State("counter", e)
 		if err != nil {
-			return harness.Note(err)
+			return imps.Note(err)
 		}
 		_ = ref.Update(func(v any) any {
 			c := v.(*counter)
@@ -88,7 +88,7 @@ func TestPerEntityStateConsistency(t *testing.T) {
 		})
 		val := ref.Get().(*counter).n
 		counters.Store(string(e), val)
-		return harness.Ignore()
+		return imps.Ignore()
 	}
 
 	imp, nc, cleanup := bringUp(t, memorySpec(N, awareness, nil))
@@ -126,15 +126,15 @@ func TestCapExceededOnNewEntity(t *testing.T) {
 	const N = 3
 	notes := make(chan any, 8)
 
-	awareness := func(_ context.Context, _ any, e harness.Entity, a harness.AwarenessContext) harness.Verdict {
+	awareness := func(_ context.Context, _ any, e imps.Entity, a imps.AwarenessContext) imps.Verdict {
 		_, err := a.State("counter", e)
 		if err != nil {
-			return harness.Note(err)
+			return imps.Note(err)
 		}
-		return harness.Ignore()
+		return imps.Ignore()
 	}
 
-	imp, nc, cleanup := bringUp(t, memorySpec(N, awareness, func(_ harness.Entity, p any) { notes <- p }))
+	imp, nc, cleanup := bringUp(t, memorySpec(N, awareness, func(_ imps.Entity, p any) { notes <- p }))
 	defer cleanup()
 
 	// Drive N+1 distinct entities.
@@ -147,7 +147,7 @@ func TestCapExceededOnNewEntity(t *testing.T) {
 	// Wait for the cap-exceeded note to arrive.
 	select {
 	case p := <-notes:
-		var capErr *harness.ErrCapExceeded
+		var capErr *imps.ErrCapExceeded
 		if !errors.As(p.(error), &capErr) {
 			t.Fatalf("expected ErrCapExceeded, got %v", p)
 		}
@@ -161,17 +161,17 @@ func TestCapExceededOnNewEntity(t *testing.T) {
 
 func TestExistingSlotsAfterCap(t *testing.T) {
 	const N = 1
-	awareness := func(_ context.Context, _ any, e harness.Entity, a harness.AwarenessContext) harness.Verdict {
+	awareness := func(_ context.Context, _ any, e imps.Entity, a imps.AwarenessContext) imps.Verdict {
 		ref, err := a.State("counter", e)
 		if err != nil {
-			return harness.Note(err)
+			return imps.Note(err)
 		}
 		_ = ref.Update(func(v any) any {
 			c := v.(*counter)
 			c.n++
 			return c
 		})
-		return harness.Ignore()
+		return imps.Ignore()
 	}
 
 	imp, nc, cleanup := bringUp(t, memorySpec(N, awareness, nil))
@@ -211,12 +211,12 @@ func TestExistingSlotsAfterCap(t *testing.T) {
 
 func TestUnknownStateShapeError(t *testing.T) {
 	notes := make(chan any, 1)
-	awareness := func(_ context.Context, _ any, e harness.Entity, a harness.AwarenessContext) harness.Verdict {
+	awareness := func(_ context.Context, _ any, e imps.Entity, a imps.AwarenessContext) imps.Verdict {
 		_, err := a.State("not-declared", e)
-		return harness.Note(err)
+		return imps.Note(err)
 	}
 
-	_, nc, cleanup := bringUp(t, memorySpec(10, awareness, func(_ harness.Entity, p any) { notes <- p }))
+	_, nc, cleanup := bringUp(t, memorySpec(10, awareness, func(_ imps.Entity, p any) { notes <- p }))
 	defer cleanup()
 
 	if err := nc.Publish("messages.in", []byte("x")); err != nil {
@@ -225,7 +225,7 @@ func TestUnknownStateShapeError(t *testing.T) {
 
 	select {
 	case p := <-notes:
-		var unk *harness.ErrUnknownStateShape
+		var unk *imps.ErrUnknownStateShape
 		if !errors.As(p.(error), &unk) || unk.Shape != "not-declared" {
 			t.Fatalf("expected ErrUnknownStateShape{not-declared}, got %v", p)
 		}
@@ -241,11 +241,11 @@ func TestConcurrentSameEntitySerialized(t *testing.T) {
 	finalSeen := make(chan int, 1)
 	var inflight atomic.Int32
 
-	awareness := func(_ context.Context, _ any, e harness.Entity, a harness.AwarenessContext) harness.Verdict {
+	awareness := func(_ context.Context, _ any, e imps.Entity, a imps.AwarenessContext) imps.Verdict {
 		// Simulate two awareness paths for the same entity racing on Update.
 		ref, err := a.State("counter", e)
 		if err != nil {
-			return harness.Note(err)
+			return imps.Note(err)
 		}
 		_ = ref.Update(func(v any) any {
 			c := v.(*counter)
@@ -259,7 +259,7 @@ func TestConcurrentSameEntitySerialized(t *testing.T) {
 			default:
 			}
 		}
-		return harness.Ignore()
+		return imps.Ignore()
 	}
 
 	imp, nc, cleanup := bringUp(t, memorySpec(N, awareness, nil))
