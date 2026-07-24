@@ -128,4 +128,4 @@ The `compile-deny` step asserts that three build tags — `awareness_publish_mus
 
 ## License
 
-TBD.
+MIT — see [`LICENSE`](./LICENSE).
