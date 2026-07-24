@@ -8,8 +8,10 @@ An **imp** is your program. You declare its inbound channels (NATS subjects or J
 
 ## Status
 
-- Core surface — channels, awareness, thinking, local state, request/reply, publish — shipped via PR #1 and PR #2.
-- Capabilities, soulstream, sleep/wake, persistence, audit: out of scope here, ship as separate features.
+- **Core surface shipped** (features `001-harness-core`, `002-capability-client`): channels (core-subject + JetStream), awareness/thinking dispatch, per-entity local state, and the outbound NATS surface — `Request` / `RequestMany` / `Publish` / `Conn`. The awareness/thinking boundary is compile-enforced (`make compile-deny`).
+- A follow-on sweep flattened the package to the module root and renamed `Wake`→`Think` and `Reasoning`→`Thinking`; the action whitelist was removed in favor of substrate NATS ACLs plus the compile-enforced boundary. See journey [episode 0001](./hq/04-JOURNEY/0001-founding-the-harness.md).
+- Soulstream coordination, sleep/wake + persistence, schedule channels, and audit are declared in the design and out of scope here — each ships as its own numbered feature (see [`hq/03-IMPLEMENTATION/roadmap.md`](./hq/03-IMPLEMENTATION/roadmap.md)).
+- How the project is run lives in [`hq/`](./hq/README.md); the license is MIT.
 
 ## Install
 
