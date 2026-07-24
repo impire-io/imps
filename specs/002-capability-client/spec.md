@@ -2,7 +2,7 @@
 
 **Feature Branch**: `002-capability-client`
 **Created**: 2026-05-11
-**Status**: Draft
+**Status**: Shipped
 **Input**: User description: "How an imp talks to anything outside itself over NATS — `Request`, `RequestMany`, `Publish`. No capability-declaration ceremony; rely on what NATS already provides. The energy gradient is enforced by which call shapes each context exposes."
 
 ## Overview
