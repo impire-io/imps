@@ -98,13 +98,15 @@ Subjects are literal — the framework performs no prefix or transformation. Cro
 
 ## Documentation
 
-Design documents (start here to understand the framework's shape):
+How the project is run lives in [`hq/`](./hq/README.md) — vision, constitution, working rules, the roadmap, and the numbered journey. Start there for *why* and *how we decide*; start here for *how to use it*.
 
-- [`docs/00-vision.md`](./docs/00-vision.md) — what an imp is, the energy-gradient principle, what the framework deliberately does *not* do.
-- [`docs/01-anatomy.md`](./docs/01-anatomy.md) — the five parts of an imp in detail, with invariants and boundaries.
-- [`docs/02-capability-service-pattern.md`](./docs/02-capability-service-pattern.md) — the service-side shape for capabilities the imp reaches over NATS.
+Design documents (the framework's shape):
 
-Constitutional principles: [`.specify/memory/constitution.md`](./.specify/memory/constitution.md) (v2.2.0).
+- [`hq/00-GENESIS/vision.md`](./hq/00-GENESIS/vision.md) — what an imp is, the energy-gradient principle, what the framework deliberately does *not* do.
+- [`hq/02-DESIGN/0001-anatomy.md`](./hq/02-DESIGN/0001-anatomy.md) — the five parts of an imp in detail, with invariants and boundaries.
+- [`hq/02-DESIGN/0002-capability-service-pattern.md`](./hq/02-DESIGN/0002-capability-service-pattern.md) — the service-side shape for capabilities the imp reaches over NATS.
+
+Constitutional principles: [`hq/00-GENESIS/constitution.md`](./hq/00-GENESIS/constitution.md) (v2.3.0; `.specify/memory/constitution.md` symlinks to it).
 
 Feature specs, plans, and contracts:
 
