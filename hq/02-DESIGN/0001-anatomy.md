@@ -8,6 +8,15 @@ An imp is what holds itself together. This document defines what an imp is made 
 
 An imp has five parts: **channels**, **awareness**, **thinking**, **memory**, **action**. Each has a defined surface, defined invariants, and a defined relationship to the others. Nothing in the framework's vocabulary exists outside these five.
 
+## Maturity
+
+The five parts are all specified here; not all of each part is built yet (see the [`README.md`](README.md) status legend and [`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md)).
+
+- **[V] Built and shipped** (features 001–002): core-subject and JetStream stream channels (subscribe / decode / dispatch), awareness with the three-verdict return, thinking in its own goroutine, per-entity local state (get / set / update), and the outbound action surface — `Request`, `RequestMany`, `Publish`, and `Conn`. The awareness/thinking boundary is compile-enforced (see below).
+- **[D] Designed, not yet built:** soulstream channels and `Note`-driven contributions, schedule channels, local-memory eviction / rehydration and cross-restart persistence, the wake-hook, and per-action audit records. Each has a defined seam and ships as its own numbered feature.
+
+Every requirement below is mandatory when its part is built; the maturity tag says *when*, not *whether*.
+
 ## Channels
 
 A channel is an inbound message subscription. Channels are how messages reach an imp.
@@ -22,9 +31,9 @@ Three things a channel does:
 
 Channels can be of three kinds:
 
-- **External channels** — subjects outside the imp's own namespace (e.g. `bridge.emails.>`, `sensors.temperature.>`). The imp watches the world here.
-- **Soulstream channels** — subjects under `$soulstream.*` for topics the imp participates in. Joining a topic adds a soulstream channel; leaving removes it.
-- **Schedule channels** — subjects fed by NATS server-side scheduling. The imp registers a schedule (cadence, target subject), and the framework subscribes the schedule's target as a channel. Periodic work flows through here.
+- **External channels** [V] — subjects outside the imp's own namespace (e.g. `bridge.emails.>`, `sensors.temperature.>`), either a core NATS subject or a JetStream stream. The imp watches the world here.
+- **Soulstream channels** [D] — subjects under `$soulstream.*` for topics the imp participates in. Joining a topic adds a soulstream channel; leaving removes it.
+- **Schedule channels** [D] — subjects fed by NATS server-side scheduling. The imp registers a schedule (cadence, target subject), and the framework subscribes the schedule's target as a channel. Periodic work flows through here.
 
 All three kinds use the same dispatch mechanism. The awareness layer doesn't see which kind a message came from; it sees a message, an entity, and a context.
 
@@ -52,7 +61,7 @@ Awareness is *not* allowed to:
 - Open new soulstream topics or send DMs.
 - Recurse into thinking directly. (Returning `Think` is how thinking is invoked.)
 
-The structural enforcement: the awareness context's type exposes only the bounded outbound surface. `RequestMany`, `Publish`, and `Conn` do not exist on it. A developer cannot accidentally make awareness expensive because the methods aren't reachable. NATS subject permissions on the imp's connection enforce the same boundary as a backstop at the substrate.
+The structural enforcement: the awareness context's type (`AwarenessContext`) exposes only the bounded outbound surface — `State` and `Request`. `RequestMany`, `Publish`, and `Conn` do not exist on it. A developer cannot accidentally make awareness expensive because the methods aren't reachable. The three absences are asserted mechanically: build-tagged files under `integration/compiletest/` each reference one of `AwarenessContext.RequestMany`, `.Publish`, or `.Conn`, and `make compile-deny` requires every one of them to *fail* to compile — a successful build under any deny tag is a regression. NATS subject permissions on the imp's connection enforce the same boundary as a backstop at the substrate.
 
 The boundedness criterion is **call shape**, not endpoint metadata. A single request/reply is bounded by virtue of being a single request/reply with a deadline; the framework does not need to inspect what's on the other end of the subject to know the call is bounded.
 
@@ -86,14 +95,14 @@ A thinking function may be called concurrently for different entities. Thinking 
 
 ### The thinking context
 
-The thinking context is the imp's gateway to the world outside its local state. It exposes:
+The thinking context (`ThinkingContext`) is the imp's gateway to the world outside its local state. It exposes:
 
 - **Outbound NATS** — `Request`, `RequestMany`, `Publish`, and the raw `Conn()`. Whatever is on the other end of a subject — an inference service, a knowledge store, a tool runner, a peer imp — is the operator's design. The framework consumes bytes.
 - **Soulstream operations** — open a topic, post a turn, mention, attach.
 - **Local state access** — read and write the imp's per-entity state.
 - **Delegation** — request/reply against other imps via the coordination pattern.
 
-The thinking context is the imp's single point of contact with anything external. Awareness has the bounded subset of the same context.
+The thinking context is the imp's single point of contact with anything external. Awareness has the bounded subset (`State` and `Request` only) of the same surface.
 
 ## Memory
 
@@ -105,7 +114,7 @@ Local memory has three kinds, distinguished by what they hold and how they're in
 - **Imp-scoped facts** — typed records the imp looks up by key. Configuration, recent records, working sets. Not statistically interpreted.
 - **Imp-scoped indexes** — secondary views over imp-scoped facts (filter, group-by). Cheap to maintain, useful for in-process lookups.
 
-Local memory is bounded. The framework enforces retention and eviction by default — per-entity state has a configured lifetime, eviction sends cold entities to the persistence backend, on rehydration they come back. A developer who wants unbounded local memory has to opt in explicitly. The default is small and stays small.
+Local memory is bounded. The framework enforces retention and eviction by default [D] — per-entity state has a configured lifetime, eviction sends cold entities to the persistence backend, on rehydration they come back. A developer who wants unbounded local memory has to opt in explicitly. The default is small and stays small.
 
 Local memory does *not* hold:
 
@@ -116,7 +125,7 @@ Local memory does *not* hold:
 
 All of those live in external services. The imp queries them during thinking when context from outside the immediate moment is needed.
 
-### Persistence and sleep
+### Persistence and sleep [D]
 
 Local memory survives sleep. When the framework suspends an imp via the configured isolation mechanism's snapshot facility, the full memory image is preserved; on wake, the imp resumes with state intact. Wall-clock time, however, has passed — the framework exposes a wake-hook that signals to the imp how long it slept, and projections that depend on wall-clock decay (EMA, "stable for", "idle since") use the hook to advance their internal state.
 
@@ -130,12 +139,12 @@ Action is the imp's outbound surface. It's how the imp affects the world.
 
 An imp has three kinds of action:
 
-- **NATS sends** — `Request`, `RequestMany`, `Publish`, and `Conn()`-driven calls from thinking. Subject permissioning is a substrate concern — operators constrain what an imp can publish on via NATS account ACLs on the imp's connection, not via a framework-side whitelist.
-- **Soulstream operations** — opening topics, posting turns, mentioning. These flow through the soulstream's subject conventions.
+- **NATS sends** [V] — `Request`, `RequestMany`, `Publish`, and `Conn()`-driven calls from thinking. Subject permissioning is a substrate concern — operators constrain what an imp can publish on via NATS account ACLs on the imp's connection, not via a framework-side whitelist.
+- **Soulstream operations** [D] — opening topics, posting turns, mentioning. These flow through the soulstream's subject conventions.
 
 Action is thinking-only. Awareness can `Note` (which produces lightweight soulstream activity) and `Request` (a single bounded round-trip) but cannot fan out, fire-and-forget, or invoke side-effecting NATS calls outside the bounded shape. The energy gradient is preserved here too: cheap interpretation doesn't produce expensive outputs.
 
-Every action emission produces an audit record — what was emitted, by which imp, against which entity, in response to which escalation. The framework writes audit records to a tenant-scoped audit stream so the colony's behavior is reconstructable.
+Every action emission produces an audit record [D] — what was emitted, by which imp, against which entity, in response to which escalation. The framework writes audit records to a tenant-scoped audit stream so the colony's behavior is reconstructable.
 
 ## How the parts fit together
 
@@ -168,7 +177,7 @@ The framework holds no "capability" abstraction. Whatever is on the other end of
 
 There is no startup discovery, no resolved surface, no declared capabilities on the imp's spec, no `HasCapability` check, no `$SRV.INFO` round-trip performed by the framework on the imp's behalf. The framework is smaller than this — and the structural enforcement of the energy gradient does not depend on knowing what's on the other end of a subject.
 
-## The wake-hook
+## The wake-hook [D]
 
 When the framework restores an imp from a snapshot, it calls the imp's wake hook with the wall-clock duration that elapsed during sleep. The wake hook is optional; imps that don't need it ignore it.
 
@@ -204,9 +213,10 @@ A record of choices and their rationale, for future reference:
 - **Five parts, not three or seven.** Three (awareness/thinking/action) was too few — memory and channels needed naming. Seven (the current projection/derivation/reactor/knowledge/index/etc. taxonomy) was too many for the developer surface. Five is what survived after pruning.
 - **Awareness can issue a single `Request`.** Earlier drafts had awareness as fully-local. That broke as soon as classification needed an external call (embed, classify). A single bounded request/reply is structurally bounded by call shape; that's what landed.
 - **Call-shape boundedness, not endpoint-metadata boundedness.** Considered metadata-driven enforcement (capability endpoints declare themselves bounded; the framework consults metadata). Rejected: it requires the framework to model capabilities, perform startup discovery, and maintain a resolved surface. Call-shape enforcement (awareness has `Request` only; thinking has the full set) gets the same guarantee with no framework-side bookkeeping.
+- **The boundary is compile-enforced, not whitelist-enforced.** Earlier drafts constrained the outbound surface with a framework-side action whitelist (`ImpSpec.Actions`, rejected publishes, whitelist-violation metrics). Removed (constitution v2.2.0): subject permissioning is a substrate concern (NATS account ACLs), and the awareness/thinking boundary is enforced by *which methods exist on each context type*, proven by the `integration/compiletest/` build-tag assertions. The framework holds no whitelist.
 - **One connection per imp, not two.** Considered separate awareness and thinking NATS connections with different subject permissions. Rejected as overengineering — type-level discipline plus subject permissions on a single connection is enough.
 - **No discovery, no `$SRV.INFO` round-trip at startup.** Considered required-capability resolution that fails imp startup if dependencies are missing. Rejected: the framework holds no capability concept at all. Whatever is on the other end of a subject is the operator's design.
-- **Subjects are literal.** Each subject the imp declares is the wire subject verbatim. The framework imposes no prefix, no platform-mode segment, no rewrites. Cross-account routing and tenant scoping are configured at the substrate via NATS account imports (constitution v2.2.0 "Imps see one subject path").
+- **Subjects are literal.** Each subject the imp declares is the wire subject verbatim. The framework imposes no prefix, no platform-mode segment, no rewrites. Cross-account routing and tenant scoping are configured at the substrate via NATS account imports (constitution "Imps see one subject path").
 - **Sleep is the common case, hard restart is the exception.** Memory and persistence are designed around snapshot-based sleep first; replay-from-backend is the cold-start path, not the hot path. The framework specifies the sleep/wake contract; the isolation mechanism that implements it (microVMs, containers, processes, simulation) is an infrastructure choice.
 - **The wake-hook is mandatory in design even if optional in implementation.** Time-skip after sleep is a real bug class; designing it in early is cheaper than retrofitting.
 

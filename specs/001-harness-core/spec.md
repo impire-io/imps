@@ -2,7 +2,7 @@
 
 **Feature Branch**: `001-harness-core`
 **Created**: 2026-05-10
-**Status**: Draft
+**Status**: Shipped
 **Input**: User description: "The harness core. The minimal substrate that holds an imp together — channel subscription, awareness dispatch, reasoning invocation, local per-entity memory, and action publishing."
 
 ## Overview
