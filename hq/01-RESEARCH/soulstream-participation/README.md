@@ -1,0 +1,61 @@
+# Can soulstream topic participation ride the existing channel seam?
+
+**State:** active
+**Started:** 2026-07-25
+
+## Abstract
+
+M1 on the roadmap — soulstream coordination channels — is the next declared
+milestone, and its gate needs two things this topic exists to produce: the
+soulstream service's subject contract (owned by the `soulstream` repo; this
+framework only consumes it) and evidence that topic participation fits the
+harness as it is. The investigation pins that contract to its owner and tests
+whether joining a topic can be an ordinary channel-add on the existing dispatch
+seam, with awareness's surface growing by at most `Note`. A decisive answer
+graduates into the `02-DESIGN/` doc that clears M1's gate for
+`/speckit-specify`; a negative answer redirects M1's shape before any harness
+code is written.
+
+## The question
+
+Can an imp join, contribute to (turns from thinking, notes from awareness), and
+leave soulstream topics purely by consuming the soulstream service's subject
+contract — with topic membership expressed as channel add/remove on the
+existing dispatch seam, and awareness gaining at most `Note`?
+
+## Pre-registered bars
+
+- **Bar 1 — the contract is pinned to its owner.** Every subject, payload
+  shape, and lifecycle rule the design consumes (join, post turn, note, leave,
+  and whatever the service requires around them) is recorded in a contract
+  table where each row cites its owning handler in the `soulstream` repo's
+  source or a recorded request/reply against a live soulstream service.
+  *Pass:* zero consumed subjects resting on guesswork. *Fail:* any row without
+  owning-repo or live-service evidence.
+- **Bar 2 — topics ride the seam unchanged.** A scratchpad spike wires a topic
+  subscription as a channel against embedded NATS, stubbing the soulstream
+  subjects exactly per the Bar 1 table. *Pass:* topic messages dispatch through
+  the existing channel seam with the harness's dispatch code byte-identical (no
+  new dispatch branch, no contract change), demonstrated by the spike running
+  green. *Fail:* the spike needs any modification to the dispatch contract.
+- **Bar 3 — awareness stays bounded.** In the proposed API shape, awareness
+  gains at most `Note`; no topic open/close/leave method lands on
+  `AwarenessContext`. *Pass:* `make compile-deny` green against the spike's API
+  shape and zero topic-lifecycle methods on `AwarenessContext`. *Fail:*
+  otherwise.
+
+## Reversal condition
+
+If the soulstream contract requires stateful handshakes, per-topic ordering, or
+server-driven membership that the spike can only satisfy by adding a new
+dispatch path or a protocol state machine inside the harness — Bar 2 failing
+for contract reasons, not implementation reasons — the direction reverses:
+topic participation becomes an external capability client per
+[`../../02-DESIGN/0002-capability-service-pattern.md`](../../02-DESIGN/0002-capability-service-pattern.md)
+rather than a channel kind, and M1 is redrafted accordingly.
+
+## Verdict
+
+<Empty until graduation. Filled by /research-graduate: PASS/FAIL per bar with
+the honest numbers, each load-bearing claim tagged [measured] /
+[mechanism-argument] / [judgment].>
