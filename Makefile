@@ -16,15 +16,19 @@ fmt:
 
 tidy:
 	go mod tidy
+	cd soulstream && go mod tidy
 
 test: compile-deny
 	go test -race -count=1 ./...
+	cd soulstream && go test -race -count=1 ./...
 
 lint:
 	golangci-lint run ./...
+	cd soulstream && golangci-lint run ./...
 
 build:
 	go build ./...
+	cd soulstream && go build ./...
 
 # compile-deny asserts that each build tag under ./integration/compiletest/
 # produces a compile error. A successful (non-error) build is a regression.
