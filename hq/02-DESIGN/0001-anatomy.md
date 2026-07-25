@@ -32,7 +32,7 @@ Three things a channel does:
 Channels can be of three kinds:
 
 - **External channels** [V] — subjects outside the imp's own namespace (e.g. `bridge.emails.>`, `sensors.temperature.>`), either a core NATS subject or a JetStream stream. The imp watches the world here.
-- **Soulstream channels** [D] — subjects under `$soulstream.*` for topics the imp participates in. Joining a topic adds a soulstream channel; leaving removes it.
+- **Soulstream channels** [D] — the topic op-log read as a stream channel (`SOULSTREAM.TOPICS.OPS.<topic-path>`; the protocol has no join/leave — presence *is* the consumer, so joining is declaring the channel and leaving is stopping it). Specified in [`0003-soulstream-participation.md`](0003-soulstream-participation.md).
 - **Schedule channels** [D] — subjects fed by NATS server-side scheduling. The imp registers a schedule (cadence, target subject), and the framework subscribes the schedule's target as a channel. Periodic work flows through here.
 
 All three kinds use the same dispatch mechanism. The awareness layer doesn't see which kind a message came from; it sees a message, an entity, and a context.

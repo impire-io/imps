@@ -20,6 +20,7 @@ propagate back here (see
 |---|---|---|
 | 0001 | [`0001-anatomy.md`](0001-anatomy.md) | The five parts of an imp — channels, awareness, thinking, memory, action — their surfaces, invariants, and the compile-enforced boundary between awareness and thinking |
 | 0002 | [`0002-capability-service-pattern.md`](0002-capability-service-pattern.md) | The shared deployment shape every capability service follows (NATS micro registration, subject convention, statelessness); wire protocols stay per-capability |
+| 0003 | [`0003-soulstream-participation.md`](0003-soulstream-participation.md) | How an imp participates in soulstream topics — the topic op-log as an existing stream channel, the `Note` bridge, the thinking-tier write path — as a glue module beside the harness core |
 
 The vision ([`../00-GENESIS/vision.md`](../00-GENESIS/vision.md)) is the map;
 read it first. `0001-anatomy.md` is the natural place for an implementer to

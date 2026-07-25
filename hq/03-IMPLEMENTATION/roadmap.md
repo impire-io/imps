@@ -19,28 +19,38 @@ commitments suggest; it is not fixed, and a real use case can re-order it.
 
 ## Now — the front
 
-Nothing is in flight. The substrate is at a natural pause: the core anatomy and
-the outbound surface are shipped and green, and the next milestone is a design
-decision, not a coding one. The front reopens when a milestone below graduates
-from `[D]` to a numbered feature.
+**M1 is ready to open.** The `soulstream-participation` research topic
+concluded ([episode 0003](../04-JOURNEY/0003-soulstream-participation.md),
+2026-07-25): the subject contract is pinned to its owning repo, the spike
+proved participation needs zero harness changes, and the design doc —
+[`../02-DESIGN/0003-soulstream-participation.md`](../02-DESIGN/0003-soulstream-participation.md)
+— is written for `/speckit-specify`. The next act is opening the numbered
+feature from it.
 
 ## Next — the declared, unbuilt parts of an imp
 
 ### M1. Soulstream coordination channels
 
-Imps participate in **topics** on the soulstream: joining a topic adds a
-channel, leaving removes it, and awareness's `Note` emits lightweight
-contributions without escalating to thinking (vision "Coordination happens
-through the soulstream"; anatomy, Channels / Action `[D]`).
+Imps participate in **topics** on the soulstream: a topic reads as a channel,
+and awareness's `Note` emits lightweight contributions without escalating to
+thinking (vision "Coordination happens through the soulstream"; anatomy,
+Channels / Action `[D]`). The research reshaped the milestone: the protocol
+has no join/leave — presence is the consumer — so M1 ships as a **glue
+module** (`imps/soulstream`, own `go.mod`) with the harness core untouched,
+and participation is static (the topic set is fixed at `Run`; runtime
+join/leave is deferred behind the reversal condition registered in episode
+0003).
 
-- *Gate:* a soulstream-participation design doc in `02-DESIGN/`, plus the
-  soulstream service's subject contract (external dependency — the `soulstream`
-  repo owns the wire protocol; this milestone consumes it, it does not define
-  it).
-- *Exit:* an imp joins a topic, posts turns and notes, and leaves, with the
-  channel lifecycle riding the existing dispatch seam; awareness keeps its
-  bounded surface (Note only, no topic-open); shipped modes' behavior
-  untouched, gate green including `compile-deny`.
+- *Gate:* **met (2026-07-25)** — design doc
+  [`0003-soulstream-participation.md`](../02-DESIGN/0003-soulstream-participation.md)
+  plus the subject contract pinned `file:line` to the `soulstream` repo
+  (episode 0003; the owner repo keeps the wire protocol — this milestone
+  consumes it, it does not define it).
+- *Exit:* an imp joins a topic (declares its channel), posts turns and notes,
+  and leaves, with the channel lifecycle riding the existing dispatch seam;
+  awareness keeps its bounded surface (Note only, no topic-open); shipped
+  modes' behavior untouched; the core module's `go.mod` unchanged; gate green
+  including `compile-deny`, covering the new nested module.
 
 ### M2. Sleep/wake and snapshot persistence
 
