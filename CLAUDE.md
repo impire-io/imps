@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan at
-specs/002-capability-client/plan.md.
+specs/004-soulstream-participation/plan.md.
 <!-- SPECKIT END -->
 
 ## How this project is run (read this first)
