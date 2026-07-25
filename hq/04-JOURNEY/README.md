@@ -37,20 +37,23 @@ anti-drift Working Agreement), and how-we-work; research runs a
 episodes with the structure enforced by `internal/hqlint`; the license is
 **MIT**.
 
-**M1's gate is cleared** ([episode 0003](0003-soulstream-participation.md)):
-the first research topic, `soulstream-participation`, ran its pre-registered
-bars and graduated to design in one day (2026-07-25). The soulstream subject
-contract is pinned to its owning repo, and the spike proved participation
-needs **zero harness changes** — the protocol has no join/leave, a topic reads
-as the existing `StreamSource` channel, and the shipped `Note` verdict bridges
-to `comment.add` contributions. The design,
-[`../02-DESIGN/0003-soulstream-participation.md`](../02-DESIGN/0003-soulstream-participation.md),
-specifies M1 as a **glue module** (`imps/soulstream`, own `go.mod`) and is
-ready for `/speckit-specify`. The remaining milestones (sleep/wake + snapshot
-persistence, schedule channels, audit emission) stay `[D]`, sequenced
-gates-not-dates in
-[`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md). There
-are no active research topics.
+**M1 is shipped** ([episode 0003](0003-soulstream-participation.md) →
+[episode 0004](0004-soulstream-participation-shipped.md)): on 2026-07-25 the
+`soulstream-participation` research topic ran its pre-registered bars,
+graduated to design, and the feature (`004-soulstream-participation`) landed —
+research to shipped module in one day. The soulstream protocol has no
+join/leave — presence is the consumer — so participation ships as the
+`imps/soulstream` **nested glue module** (owner library pinned at v0.4.0):
+`TopicChannel` reads a topic through the existing `StreamSource`, the
+`NoteBridge` turns the shipped `Note` verdict into anchored `comment.add`
+contributions, and `Participant` gives thinking the full write path on the
+imp's own connection. The harness core's diff for the whole feature is
+**zero** — `go.mod` byte-identical, compile-deny green — and the research
+spike is now the permanent integration suite. The remaining milestones
+(sleep/wake + snapshot persistence, schedule channels, audit emission) stay
+`[D]`, sequenced gates-not-dates in
+[`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md); M2 is
+the front and needs its design doc. There are no active research topics.
 
 ## Episode index
 
@@ -59,3 +62,4 @@ are no active research topics.
 | 0001 | [Founding the harness: the substrate, then the sweep](0001-founding-the-harness.md) |
 | 0002 | [The project moves into HQ, and picks a license](0002-hq-adoption-and-mit.md) |
 | 0003 | [Soulstream participation: the join that isn't there](0003-soulstream-participation.md) |
+| 0004 | [M1 ships: soulstream participation as a glue module](0004-soulstream-participation-shipped.md) |

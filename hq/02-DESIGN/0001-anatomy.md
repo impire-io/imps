@@ -12,8 +12,8 @@ An imp has five parts: **channels**, **awareness**, **thinking**, **memory**, **
 
 The five parts are all specified here; not all of each part is built yet (see the [`README.md`](README.md) status legend and [`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md)).
 
-- **[V] Built and shipped** (features 001–002): core-subject and JetStream stream channels (subscribe / decode / dispatch), awareness with the three-verdict return, thinking in its own goroutine, per-entity local state (get / set / update), and the outbound action surface — `Request`, `RequestMany`, `Publish`, and `Conn`. The awareness/thinking boundary is compile-enforced (see below).
-- **[D] Designed, not yet built:** soulstream channels and `Note`-driven contributions, schedule channels, local-memory eviction / rehydration and cross-restart persistence, the wake-hook, and per-action audit records. Each has a defined seam and ships as its own numbered feature.
+- **[V] Built and shipped** (features 001–002): core-subject and JetStream stream channels (subscribe / decode / dispatch), awareness with the three-verdict return, thinking in its own goroutine, per-entity local state (get / set / update), and the outbound action surface — `Request`, `RequestMany`, `Publish`, and `Conn`. The awareness/thinking boundary is compile-enforced (see below). Feature 004 added soulstream channels and `Note`-driven contributions as the `imps/soulstream` glue module — the harness core untouched.
+- **[D] Designed, not yet built:** schedule channels, local-memory eviction / rehydration and cross-restart persistence, the wake-hook, and per-action audit records. Each has a defined seam and ships as its own numbered feature.
 
 Every requirement below is mandatory when its part is built; the maturity tag says *when*, not *whether*.
 
@@ -32,7 +32,7 @@ Three things a channel does:
 Channels can be of three kinds:
 
 - **External channels** [V] — subjects outside the imp's own namespace (e.g. `bridge.emails.>`, `sensors.temperature.>`), either a core NATS subject or a JetStream stream. The imp watches the world here.
-- **Soulstream channels** [D] — the topic op-log read as a stream channel (`SOULSTREAM.TOPICS.OPS.<topic-path>`; the protocol has no join/leave — presence *is* the consumer, so joining is declaring the channel and leaving is stopping it). Specified in [`0003-soulstream-participation.md`](0003-soulstream-participation.md).
+- **Soulstream channels** [V] — the topic op-log read as a stream channel (`SOULSTREAM.TOPICS.OPS.<topic-path>`; the protocol has no join/leave — presence *is* the consumer, so joining is declaring the channel and leaving is stopping it). Shipped as the `imps/soulstream` glue module; specified in [`0003-soulstream-participation.md`](0003-soulstream-participation.md).
 - **Schedule channels** [D] — subjects fed by NATS server-side scheduling. The imp registers a schedule (cadence, target subject), and the framework subscribes the schedule's target as a channel. Periodic work flows through here.
 
 All three kinds use the same dispatch mechanism. The awareness layer doesn't see which kind a message came from; it sees a message, an entity, and a context.
@@ -140,7 +140,7 @@ Action is the imp's outbound surface. It's how the imp affects the world.
 An imp has three kinds of action:
 
 - **NATS sends** [V] — `Request`, `RequestMany`, `Publish`, and `Conn()`-driven calls from thinking. Subject permissioning is a substrate concern — operators constrain what an imp can publish on via NATS account ACLs on the imp's connection, not via a framework-side whitelist.
-- **Soulstream operations** [D] — opening topics, posting turns, mentioning. These flow through the soulstream's subject conventions.
+- **Soulstream operations** [V] — opening topics, posting turns, mentioning, via the `imps/soulstream` glue module's `Participant` (the owner library does the wire). These flow through the soulstream's subject conventions.
 
 Action is thinking-only. Awareness can `Note` (which produces lightweight soulstream activity) and `Request` (a single bounded round-trip) but cannot fan out, fire-and-forget, or invoke side-effecting NATS calls outside the bounded shape. The energy gradient is preserved here too: cheap interpretation doesn't produce expensive outputs.
 

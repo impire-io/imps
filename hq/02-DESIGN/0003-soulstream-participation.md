@@ -5,8 +5,9 @@ contributing notes from awareness and turns from thinking, and leaving. This
 document is the M1 design (roadmap, "Soulstream coordination channels"),
 graduated from the `soulstream-participation` research topic
 ([episode 0003](../04-JOURNEY/0003-soulstream-participation.md)). Everything
-here is **[D]** — specified, not yet built — except where a behavior is marked
-as already shipped.
+here is **[V]** — shipped as feature `004-soulstream-participation`
+([episode 0004](../04-JOURNEY/0004-soulstream-participation-shipped.md)); this
+document describes the module as built and tested.
 
 The load-bearing finding this design rests on `[measured]`: the soulstream
 protocol has **no join, no leave, and no membership state**. Presence is a
@@ -93,14 +94,17 @@ type Noted struct {
     Body     string
 }
 
-func NoteBridge(p *Participant, next func(imps.Entity, any)) func(imps.Entity, any)
+func NoteBridge(p *Participant, next func(imps.Entity, any), onErr func(imps.Entity, Noted, error)) func(imps.Entity, any)
 ```
 
 An `OnNote` implementation. When the payload is a `Noted`, it posts
 `comment.add` on the entity's topic (the entity **is** the topic path under
 `TopicChannel`'s default extractor), anchored to `AnchorOp`, authored as the
 participant's persona. Any other payload type is passed to `next` (nil `next`
-drops it), so soulstream notes compose with local note handling.
+drops it), so soulstream notes compose with local note handling. A `Noted`
+with an empty anchor or body, an empty entity, or a publish failure goes to
+`onErr` (nil drops); nothing malformed is ever published, and the publish is
+bounded by an internal timeout so a dead substrate cannot hang dispatch.
 
 - Awareness's surface is **unchanged** — it returns the shipped `Note`
   verdict; the bridge does the publishing outside awareness's hands. The
@@ -117,13 +121,17 @@ drops it), so soulstream notes compose with local note handling.
 ### `Participant` — identity and the write path
 
 ```go
-func NewParticipant(nc *nats.Conn, realm, persona string, opts ...ParticipantOption) (*Participant, error)
+func NewParticipant(ctx context.Context, nc *nats.Conn, realm, persona string, opts ...ParticipantOption) (*Participant, error)
 ```
 
 Wraps the imp's **own** NATS connection in the owner's `realm.NewClient`
 (`[measured]`: no second connection needed). Persona is required for any write
 path; an optional Ed25519 signer (`WithSigner`) makes every op signed. The
-Participant MUST NOT close the wrapped connection (the imp owns it).
+Participant MUST NOT close the wrapped connection (the imp owns it) — and
+because the owner's client closes a connection it fails to construct around,
+`NewParticipant` confirms JetStream reachability itself first, so a
+construction failure leaves the connection open `[measured]` (regression test
+in `participant_test.go`).
 
 Thinking-tier operations use the owner's library through the Participant:
 `StartTopic`, `Open(path)` → `PostTurn` / `AddComment` / `Close`, materialise

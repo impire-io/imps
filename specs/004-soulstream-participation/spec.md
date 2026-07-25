@@ -2,7 +2,7 @@
 
 **Feature Branch**: `004-soulstream-participation`
 **Created**: 2026-07-25
-**Status**: Draft
+**Status**: Shipped
 **Input**: User description: "Soulstream participation as a glue module, per hq/02-DESIGN/0003-soulstream-participation.md: a nested Go module github.com/impire-io/imps/soulstream that lets an imp participate in soulstream topics with zero harness-core changes."
 
 **Design source**: [`hq/02-DESIGN/0003-soulstream-participation.md`](../../hq/02-DESIGN/0003-soulstream-participation.md)

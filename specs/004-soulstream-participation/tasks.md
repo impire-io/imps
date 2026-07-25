@@ -72,7 +72,7 @@
 - [x] T019 [P] Compile-check the quickstart: keep `specs/004-soulstream-participation/quickstart.md` in sync with the implemented API (adjust the doc if any signature drifted during implementation; the contract file governs — drift beyond the contract must be surfaced, not silently adopted)
 - [x] T020 Core byte-identity verification per `contracts/repo-gate.md`: `git diff main -- go.mod go.sum` is empty; the branch's changed-file list stays within `soulstream/`, `Makefile`, `.github/workflows/ci.yml`, `specs/004-soulstream-participation/`, `hq/`, `CLAUDE.md` (SC-004)
 - [x] T021 Full gate: `make fmt && make test && make lint` plus `make compile-deny` — green across BOTH modules, zero skipped tests (SC-006, FR-011)
-- [ ] T022 Landing duties in the same change (hq/00-GENESIS/how-we-work.md): move M1 to the roadmap ledger with the outcome, write the journey episode via `/journey-log`, propagate any behavioral drift back into `hq/02-DESIGN/0003-soulstream-participation.md`, refresh `hq/04-JOURNEY/README.md` "Where things stand"
+- [x] T022 Landing duties in the same change (hq/00-GENESIS/how-we-work.md): move M1 to the roadmap ledger with the outcome, write the journey episode via `/journey-log`, propagate any behavioral drift back into `hq/02-DESIGN/0003-soulstream-participation.md`, refresh `hq/04-JOURNEY/README.md` "Where things stand"
 
 ## Dependencies & Execution Order
 
