@@ -56,6 +56,36 @@ rather than a channel kind, and M1 is redrafted accordingly.
 
 ## Verdict
 
-<Empty until graduation. Filled by /research-graduate: PASS/FAIL per bar with
-the honest numbers, each load-bearing claim tagged [measured] /
-[mechanism-argument] / [judgment].>
+**Answer: yes, and more cheaply than pre-registered — participation needs zero
+harness changes.** All three bars passed on 2026-07-25; the investigation ran
+one day.
+
+- **Bar 1 — PASS `[measured]`.** The contract table ([contract.md](contract.md))
+  covers every consumed subject/operation with `file:line` evidence in the
+  owning repo; zero rows on guesswork; load-bearing rows independently
+  spot-checked against the cited source. Headline: the protocol has **no
+  join/leave and no membership state** — participation is subscribe + publish
+  (`docs/topic.md:20-21`, `03-topics.md:29`, no join/leave in `topic/vocab.go`).
+- **Bar 2 — PASS `[measured]`.** The scratchpad spike (JOURNEY.md, 2026-07-25)
+  read a live topic through the **existing** `StreamSource` channel — stream
+  `SOULSTREAM`, filter `OPS.<path>`, `DeliverAllPolicy`: 7/7 ops in stream
+  order, baseline first, history→live over one continuous consumer, ephemeral
+  consumer deleted on shutdown. Three consecutive `-race` runs (~0.5 s each);
+  `git status --porcelain` empty in both working trees — the dispatch code was
+  byte-identical, not merely contract-compatible.
+- **Bar 3 — PASS `[measured]`.** Awareness gained **nothing** (stronger than
+  the registered "at most `Note`"): the `Note` verdict already exists, and the
+  emission is the `OnNote` hook posting `comment.add` anchored to the observed
+  op via the owner's library. `make compile-deny` green on the unchanged tree;
+  zero topic-lifecycle methods on `AwarenessContext`.
+
+**Reversal condition: not triggered `[measured]`** — no handshake, session,
+ack protocol, or state machine exists anywhere in topic participation; the
+consumer-side state is a best-effort frontier (empty is legal and was
+exercised) and the baseline-first replay rule, both absorbed by existing
+channel semantics.
+
+**Graduation direction: design.** The adversarial pass (JOURNEY.md) resolved
+library-vs-wire in favour of a glue package outside the harness core
+(`[judgment]`, reversal condition registered: a real scenario requiring an
+imp's topic set to change without restart reopens runtime channel lifecycle).
