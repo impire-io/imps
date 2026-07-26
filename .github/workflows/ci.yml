@@ -26,16 +26,26 @@ jobs:
           fi
 
       - name: Build
-        run: go build ./...
+        run: |
+          go build ./...
+          cd soulstream && go build ./...
 
       - name: Compile-deny (energy-gradient invariants)
         run: make compile-deny
 
       - name: Test
         # Includes the hq structural lint (internal/hqlint).
-        run: go test -race ./...
+        run: |
+          go test -race ./...
+          cd soulstream && go test -race ./...
 
       - name: Lint
         uses: golangci/golangci-lint-action@v8
         with:
           version: latest
+
+      - name: Lint (soulstream module)
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          working-directory: soulstream

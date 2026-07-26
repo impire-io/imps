@@ -19,38 +19,13 @@ commitments suggest; it is not fixed, and a real use case can re-order it.
 
 ## Now — the front
 
-**M1 is ready to open.** The `soulstream-participation` research topic
-concluded ([episode 0003](../04-JOURNEY/0003-soulstream-participation.md),
-2026-07-25): the subject contract is pinned to its owning repo, the spike
-proved participation needs zero harness changes, and the design doc —
-[`../02-DESIGN/0003-soulstream-participation.md`](../02-DESIGN/0003-soulstream-participation.md)
-— is written for `/speckit-specify`. The next act is opening the numbered
-feature from it.
+Nothing is in flight. M1 (soulstream coordination channels) landed as feature
+`004-soulstream-participation` — one day from research pre-registration to
+shipped module ([episode 0004](../04-JOURNEY/0004-soulstream-participation-shipped.md));
+see the ledger. The next milestone, M2, is a design decision, not a coding
+one: the front reopens when its `02-DESIGN/` doc exists.
 
 ## Next — the declared, unbuilt parts of an imp
-
-### M1. Soulstream coordination channels
-
-Imps participate in **topics** on the soulstream: a topic reads as a channel,
-and awareness's `Note` emits lightweight contributions without escalating to
-thinking (vision "Coordination happens through the soulstream"; anatomy,
-Channels / Action `[D]`). The research reshaped the milestone: the protocol
-has no join/leave — presence is the consumer — so M1 ships as a **glue
-module** (`imps/soulstream`, own `go.mod`) with the harness core untouched,
-and participation is static (the topic set is fixed at `Run`; runtime
-join/leave is deferred behind the reversal condition registered in episode
-0003).
-
-- *Gate:* **met (2026-07-25)** — design doc
-  [`0003-soulstream-participation.md`](../02-DESIGN/0003-soulstream-participation.md)
-  plus the subject contract pinned `file:line` to the `soulstream` repo
-  (episode 0003; the owner repo keeps the wire protocol — this milestone
-  consumes it, it does not define it).
-- *Exit:* an imp joins a topic (declares its channel), posts turns and notes,
-  and leaves, with the channel lifecycle riding the existing dispatch seam;
-  awareness keeps its bounded surface (Note only, no topic-open); shipped
-  modes' behavior untouched; the core module's `go.mod` unchanged; gate green
-  including `compile-deny`, covering the new nested module.
 
 ### M2. Sleep/wake and snapshot persistence
 
@@ -125,6 +100,7 @@ would violate "capabilities are external; the harness is small."
 |---|---|---|
 | `001-harness-core` | The in-process Go substrate: channels (core-subject + JetStream), awareness dispatch, thinking invocation, per-entity local memory, action publishing; the awareness/thinking boundary compile-enforced. | [0001](../04-JOURNEY/0001-founding-the-harness.md) |
 | `002-capability-client` | The outbound NATS surface: `Request` / `RequestMany` / `Publish` / `Conn`, literal subjects, byte-shaped, no framework codec or retry. | [0001](../04-JOURNEY/0001-founding-the-harness.md) |
+| `004-soulstream-participation` | M1: soulstream topics as channels via the `imps/soulstream` nested glue module — `TopicChannel` on the existing `StreamSource`, the `Note`→`comment.add` bridge, `Participant` on the imp's own connection; harness core byte-identical. | [0004](../04-JOURNEY/0004-soulstream-participation-shipped.md) |
 
 The post-001/002 refactor sweep (package flattened to the module root, `Wake`→`Think`,
 `Reasoning`→`Thinking`, the action whitelist removed) is recorded in the same
