@@ -19,11 +19,14 @@ commitments suggest; it is not fixed, and a real use case can re-order it.
 
 ## Now — the front
 
-Nothing is in flight. M1 (soulstream coordination channels) landed as feature
-`004-soulstream-participation` — one day from research pre-registration to
-shipped module ([episode 0004](../04-JOURNEY/0004-soulstream-participation-shipped.md));
-see the ledger. The next milestone, M2, is a design decision, not a coding
-one: the front reopens when its `02-DESIGN/` doc exists.
+**M2 is ready to open.** The `sleep-wake-persistence` research topic
+concluded ([episode 0005](../04-JOURNEY/0005-sleep-wake-persistence.md),
+2026-07-26): the seam is inventoried, the spike measured a restart
+round-trip, exactly-once wake with true elapsed time, and lossless bounded
+eviction — all with zero harness changes — and the design doc,
+[`../02-DESIGN/0004-sleep-wake-persistence.md`](../02-DESIGN/0004-sleep-wake-persistence.md),
+is written for `/speckit-specify`. The next act is opening the numbered
+feature from it.
 
 ## Next — the declared, unbuilt parts of an imp
 
@@ -33,14 +36,23 @@ The wake-hook (elapsed-sleep signal), per-entity eviction to a persistence
 backend, rehydration on access, and cold-start replay — the "sleep is the
 common case" commitment, made real (vision "Imps sleep when they're not
 working"; anatomy, Memory / Persistence and sleep / The wake-hook `[D]`).
+The research reshaped the milestone: persistence lives **beside** the
+registry (riding it is blocked by four documented guarantees), shipping as
+the `imps/persist` package — no new dependencies, harness core untouched,
+write-through as the continuous snapshot, wake-on-rehydration per entity
+plus a `Beacon` pre-`Run` gate at imp level, backend uncommitted behind a
+minimal interface. Cold-start message replay needs nothing new (feature
+004's durable consumers).
 
-- *Gate:* a persistence design doc naming the snapshot/restore contract (the
-  isolation mechanism left open per the constitution) and the wake-hook
-  semantics; the eviction/rehydration boundary specified before any backend is
-  chosen ("boundaries before mechanisms").
+- *Gate:* **met (2026-07-26)** — design doc
+  [`0004-sleep-wake-persistence.md`](../02-DESIGN/0004-sleep-wake-persistence.md)
+  naming the snapshot/restore contract (envelope: codec bytes +
+  last-active), the wake-hook semantics at both levels, and the
+  eviction/rehydration boundary, with the backend left open (episode 0005).
 - *Exit:* an imp survives a snapshot/restore cycle with time-dependent state
   advanced by the wake-hook; bounded local memory evicts cold entities and
-  rehydrates them on access; the default stays small.
+  rehydrates them on access; the default stays small; the harness core and
+  its `go.mod` byte-identical; gate green including `compile-deny`.
 
 ### M3. Schedule channels
 

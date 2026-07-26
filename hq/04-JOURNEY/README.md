@@ -15,7 +15,7 @@ load-bearing as the shipped code.
 > [`../00-GENESIS/how-we-work.md`](../00-GENESIS/how-we-work.md); the numbering
 > and index are enforced by `internal/hqlint`.
 
-## Where things stand (2026-07-25)
+## Where things stand (2026-07-26)
 
 **The framework's core is shipped, and the project just moved into `hq/`.** The
 in-process Go substrate — channels (core-subject + JetStream), awareness
@@ -49,11 +49,24 @@ join/leave — presence is the consumer — so participation ships as the
 contributions, and `Participant` gives thinking the full write path on the
 imp's own connection. The harness core's diff for the whole feature is
 **zero** — `go.mod` byte-identical, compile-deny green — and the research
-spike is now the permanent integration suite. The remaining milestones
-(sleep/wake + snapshot persistence, schedule channels, audit emission) stay
-`[D]`, sequenced gates-not-dates in
-[`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md); M2 is
-the front and needs its design doc. There are no active research topics.
+spike is now the permanent integration suite.
+
+**M2's gate is cleared** ([episode 0005](0005-sleep-wake-persistence.md)):
+the `sleep-wake-persistence` research topic passed its four pre-registered
+bars on 2026-07-26 — again with zero harness changes. Persistence lives
+**beside** the registry (riding it is blocked four ways by documented
+guarantees): a write-through, bounded-LRU store with rehydration-on-access,
+wake fired exactly once per rehydration with true elapsed time, and lossless
+eviction by construction. The design,
+[`../02-DESIGN/0004-sleep-wake-persistence.md`](../02-DESIGN/0004-sleep-wake-persistence.md),
+specifies M2 as the **`imps/persist` package** (no new dependencies, so no
+module boundary), the two-tier memory rule, the envelope contract, the
+imp-level `Beacon`, and a backend-agnostic boundary with NATS KV as
+reference only. M2 is ready for `/speckit-specify`, and M3's dependency on
+settled wake semantics is satisfied. Remaining `[D]`: schedule channels,
+audit emission
+([`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md)).
+There are no active research topics.
 
 ## Episode index
 
@@ -63,3 +76,4 @@ the front and needs its design doc. There are no active research topics.
 | 0002 | [The project moves into HQ, and picks a license](0002-hq-adoption-and-mit.md) |
 | 0003 | [Soulstream participation: the join that isn't there](0003-soulstream-participation.md) |
 | 0004 | [M1 ships: soulstream participation as a glue module](0004-soulstream-participation-shipped.md) |
+| 0005 | [Sleep, wake, persistence: beside the registry, not inside it](0005-sleep-wake-persistence.md) |
