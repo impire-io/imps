@@ -2,7 +2,7 @@
 
 **Feature Branch**: `005-sleep-wake-persistence`
 **Created**: 2026-07-26
-**Status**: Draft
+**Status**: Shipped
 **Input**: User description: "Sleep, wake, and per-entity persistence per hq/02-DESIGN/0004-sleep-wake-persistence.md: an imps/persist package in the core module providing a bounded, write-through, rehydrate-on-access per-entity store, wake hooks at entity and imp level, and a backend-agnostic boundary."
 
 **Design source**: [`hq/02-DESIGN/0004-sleep-wake-persistence.md`](../../hq/02-DESIGN/0004-sleep-wake-persistence.md)

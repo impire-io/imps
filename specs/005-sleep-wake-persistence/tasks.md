@@ -59,7 +59,7 @@
 - [x] T013 [P] Keep `specs/005-sleep-wake-persistence/quickstart.md` in sync with the implemented API (compile-check its example shape; the contract file governs — drift beyond the contract must be surfaced, not silently adopted)
 - [x] T014 Byte-identity verification per `contracts/repo-gate.md`: `git diff main -- go.mod go.sum` empty; no root-package `*.go` modified; no `Makefile` or CI diff; the branch's changed-file list confined to `persist/`, `specs/005-sleep-wake-persistence/`, `hq/`, `CLAUDE.md` (SC-005)
 - [x] T015 Full gate: `make fmt && make test && make lint` plus `make compile-deny` — green across both modules, zero skipped tests (SC-006)
-- [ ] T016 Landing duties in the same change (hq/00-GENESIS/how-we-work.md): move M2 to the roadmap ledger with the outcome, write the journey episode via `/journey-log`, propagate any behavioral drift back into `hq/02-DESIGN/0004-sleep-wake-persistence.md` and flip the anatomy's Memory/Persistence/wake-hook tags to `[V]`, refresh `hq/04-JOURNEY/README.md` "Where things stand", set the spec status to Shipped
+- [x] T016 Landing duties in the same change (hq/00-GENESIS/how-we-work.md): move M2 to the roadmap ledger with the outcome, write the journey episode via `/journey-log`, propagate any behavioral drift back into `hq/02-DESIGN/0004-sleep-wake-persistence.md` and flip the anatomy's Memory/Persistence/wake-hook tags to `[V]`, refresh `hq/04-JOURNEY/README.md` "Where things stand", set the spec status to Shipped
 
 ## Dependencies & Execution Order
 

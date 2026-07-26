@@ -12,8 +12,8 @@ An imp has five parts: **channels**, **awareness**, **thinking**, **memory**, **
 
 The five parts are all specified here; not all of each part is built yet (see the [`README.md`](README.md) status legend and [`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md)).
 
-- **[V] Built and shipped** (features 001–002): core-subject and JetStream stream channels (subscribe / decode / dispatch), awareness with the three-verdict return, thinking in its own goroutine, per-entity local state (get / set / update), and the outbound action surface — `Request`, `RequestMany`, `Publish`, and `Conn`. The awareness/thinking boundary is compile-enforced (see below). Feature 004 added soulstream channels and `Note`-driven contributions as the `imps/soulstream` glue module — the harness core untouched.
-- **[D] Designed, not yet built:** schedule channels, local-memory eviction / rehydration and cross-restart persistence, the wake-hook, and per-action audit records. Each has a defined seam and ships as its own numbered feature.
+- **[V] Built and shipped** (features 001–002): core-subject and JetStream stream channels (subscribe / decode / dispatch), awareness with the three-verdict return, thinking in its own goroutine, per-entity local state (get / set / update), and the outbound action surface — `Request`, `RequestMany`, `Publish`, and `Conn`. The awareness/thinking boundary is compile-enforced (see below). Feature 004 added soulstream channels and `Note`-driven contributions as the `imps/soulstream` glue module; feature 005 added durable per-entity memory, eviction/rehydration, and the wake-hook as the `imps/persist` package — both with the harness core untouched.
+- **[D] Designed, not yet built:** schedule channels and per-action audit records. Each has a defined seam and ships as its own numbered feature.
 
 Every requirement below is mandatory when its part is built; the maturity tag says *when*, not *whether*.
 
@@ -114,7 +114,7 @@ Local memory has three kinds, distinguished by what they hold and how they're in
 - **Imp-scoped facts** — typed records the imp looks up by key. Configuration, recent records, working sets. Not statistically interpreted.
 - **Imp-scoped indexes** — secondary views over imp-scoped facts (filter, group-by). Cheap to maintain, useful for in-process lookups.
 
-Local memory is bounded. The framework enforces retention and eviction by default [D] — per-entity state has a configured lifetime, eviction sends cold entities to the persistence backend, on rehydration they come back. A developer who wants unbounded local memory has to opt in explicitly. The default is small and stays small.
+Local memory is bounded, in two tiers [V]. The ephemeral tier (`ImpSpec.States`) is cap-bounded, in-memory, and rebuildable from the stream — it rejects past its cap and never silently evicts. The durable tier (`imps/persist`, [`0004-sleep-wake-persistence.md`](0004-sleep-wake-persistence.md)) is where loss-on-restart would be a bug: write-through persistence means every update is already on the backend, so LRU eviction of cold entities is a lossless drop and rehydration on access brings them back. One tier per concern; the default resident bound is small (256) and stays small.
 
 Local memory does *not* hold:
 
@@ -125,11 +125,11 @@ Local memory does *not* hold:
 
 All of those live in external services. The imp queries them during thinking when context from outside the immediate moment is needed.
 
-### Persistence and sleep [D]
+### Persistence and sleep [V]
 
-Local memory survives sleep. When the framework suspends an imp via the configured isolation mechanism's snapshot facility, the full memory image is preserved; on wake, the imp resumes with state intact. Wall-clock time, however, has passed — the framework exposes a wake-hook that signals to the imp how long it slept, and projections that depend on wall-clock decay (EMA, "stable for", "idle since") use the hook to advance their internal state.
+Local memory survives sleep. Durable-tier state is write-through — the snapshot is continuous, so stopping the imp *is* sleeping and there is nothing to flush. Wall-clock time, however, has passed — the `imps/persist` package supplies the wake readings: a per-entity wake hook fired on rehydration with the elapsed time since that entity's last activity, and the imp-level `Beacon` whose `SleptFor` reading gates `main()` before dispatch starts. Projections that depend on wall-clock decay (EMA, "stable for", "idle since") use them to advance their internal state.
 
-Persistence across hard restarts (process death, host loss) uses the standard snapshot/restore cycle: per-entity state serializes to the persistence backend on a configurable schedule, and on cold start the imp replays state from the backend plus any messages since the snapshot.
+Persistence across hard restarts (process death, host loss) is the same mechanism: state rehydrates lazily from the backend on first access, and channel positions replay via durable consumers (feature 004). An isolation mechanism's whole-image snapshot facility (microVMs, containers) remains an infrastructure choice; the Beacon supplies the elapsed reading either way.
 
 Sleep is the common case; hard restart is the exception. Both are handled, but sleep is what's optimized for.
 
@@ -177,9 +177,9 @@ The framework holds no "capability" abstraction. Whatever is on the other end of
 
 There is no startup discovery, no resolved surface, no declared capabilities on the imp's spec, no `HasCapability` check, no `$SRV.INFO` round-trip performed by the framework on the imp's behalf. The framework is smaller than this — and the structural enforcement of the energy gradient does not depend on knowing what's on the other end of a subject.
 
-## The wake-hook [D]
+## The wake-hook [V]
 
-When the framework restores an imp from a snapshot, it calls the imp's wake hook with the wall-clock duration that elapsed during sleep. The wake hook is optional; imps that don't need it ignore it.
+Shipped in `imps/persist` at two levels: the durable store fires a per-entity wake hook on every rehydration with the elapsed time since that entity's last activity (exactly once, before the state is observable, never writing back), and the imp-level `Beacon` reports how long the whole imp slept — asked in `main()` before `Run`, which is the "single call, before any channel dispatch resumes". The wake hook is optional; imps that don't need it ignore it.
 
 Imps that do need it — anything with EMA decay, "stable for" / "idle since" semantics, debounce windows, time-to-live expirations — use the hook to advance the affected state by the elapsed duration before processing the wake-up message.
 

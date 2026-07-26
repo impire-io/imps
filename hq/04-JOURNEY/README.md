@@ -51,20 +51,24 @@ imp's own connection. The harness core's diff for the whole feature is
 **zero** — `go.mod` byte-identical, compile-deny green — and the research
 spike is now the permanent integration suite.
 
-**M2's gate is cleared** ([episode 0005](0005-sleep-wake-persistence.md)):
-the `sleep-wake-persistence` research topic passed its four pre-registered
-bars on 2026-07-26 — again with zero harness changes. Persistence lives
-**beside** the registry (riding it is blocked four ways by documented
-guarantees): a write-through, bounded-LRU store with rehydration-on-access,
-wake fired exactly once per rehydration with true elapsed time, and lossless
-eviction by construction. The design,
-[`../02-DESIGN/0004-sleep-wake-persistence.md`](../02-DESIGN/0004-sleep-wake-persistence.md),
-specifies M2 as the **`imps/persist` package** (no new dependencies, so no
-module boundary), the two-tier memory rule, the envelope contract, the
-imp-level `Beacon`, and a backend-agnostic boundary with NATS KV as
-reference only. M2 is ready for `/speckit-specify`, and M3's dependency on
-settled wake semantics is satisfied. Remaining `[D]`: schedule channels,
-audit emission
+**M2 is shipped** ([episode 0005](0005-sleep-wake-persistence.md) →
+[episode 0006](0006-sleep-wake-persistence-shipped.md)): on 2026-07-26 the
+`sleep-wake-persistence` research topic passed its four pre-registered bars
+and the feature (`005-sleep-wake-persistence`) landed — the second
+consecutive research-to-shipped single-day cycle. Persistence lives
+**beside** the registry as the **`imps/persist` package** in the core
+module (zero new dependencies, zero root-package changes, zero Makefile/CI
+edits): a write-through, bounded-LRU store (`DefaultBound = 256`) with
+rehydration-on-access, a wake hook fired exactly once per rehydration with
+true elapsed time before the state is observable, lossless eviction by
+construction, `Delete` as the only backend removal, the imp-level `Beacon`
+pre-`Run` gate, and a backend-agnostic boundary with JetStream KV as
+reference only. The anatomy's Memory / Persistence-and-sleep / wake-hook
+sections are propagated to `[V]` with the two-tier rule explicit. Three
+anatomy parts have now shipped against a harness core unchanged since
+feature 002. Remaining `[D]`: schedule channels (M3 — wake-semantics
+dependency now settled; needs its design doc and the substrate's
+server-side scheduling primitive) and audit emission
 ([`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md)).
 There are no active research topics.
 
@@ -77,3 +81,4 @@ There are no active research topics.
 | 0003 | [Soulstream participation: the join that isn't there](0003-soulstream-participation.md) |
 | 0004 | [M1 ships: soulstream participation as a glue module](0004-soulstream-participation-shipped.md) |
 | 0005 | [Sleep, wake, persistence: beside the registry, not inside it](0005-sleep-wake-persistence.md) |
+| 0006 | [M2 ships: the durable tier, transcribed from measurement](0006-sleep-wake-persistence-shipped.md) |

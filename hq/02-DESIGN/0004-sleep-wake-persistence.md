@@ -6,7 +6,11 @@ semantics at both the entity and the imp level. This document is the M2
 design (roadmap, "Sleep/wake and snapshot persistence"), graduated from the
 `sleep-wake-persistence` research topic
 ([episode 0005](../04-JOURNEY/0005-sleep-wake-persistence.md)). Everything
-here is **[D]** — specified, not yet built.
+here is **[V]** — shipped as feature `005-sleep-wake-persistence`
+([episode 0006](../04-JOURNEY/0006-sleep-wake-persistence-shipped.md)); this
+document describes the package as built and tested. The implementation
+matched this contract with no drift (one addition: the default bound is the
+exported constant `DefaultBound = 256`).
 
 The load-bearing finding this design rests on `[measured]`: persistence
 lives **beside** the registry, not inside it. Riding the shipped registry is
