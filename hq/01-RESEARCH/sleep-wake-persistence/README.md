@@ -69,6 +69,38 @@ beside it.
 
 ## Verdict
 
-<Empty until graduation. Filled by /research-graduate: PASS/FAIL per bar with
-the honest numbers, each load-bearing claim tagged [measured] /
-[mechanism-argument] / [judgment].>
+**Answer: yes — beside the registry, not inside it.** All four bars passed on
+2026-07-26, the topic's opening day, with **zero harness changes** (stronger
+than the pre-registration, which held minimal additions in reserve).
+
+- **Bar 1 — PASS `[measured]`.** The seam inventory (JOURNEY.md table) pins
+  every needed hook with `file:line` evidence. The registry-riding route is
+  blocking four ways at once (cap-rejection contract, error-less `Get`,
+  entity-less `Factory`, no enumeration) — but the boundary doesn't need the
+  registry: `Entity` + user code + a backend are already-sufficient, so zero
+  hooks in the *chosen* route are blocking and none were even needed.
+- **Bar 2 — PASS `[measured]`.** The spike's restart round-trip: state
+  mutated through a real imp's awareness (write-through to NATS KV as the
+  reference backend), imp stopped, fresh instance rehydrated `Counter == 6`
+  equal under the codec. 3 consecutive `-race` runs; imps tree
+  byte-identical.
+- **Bar 3 — PASS `[measured]`.** Wake fired exactly once per rehydration,
+  elapsed ≥ the 400 ms slept and wall-clock-bounded, state advanced as a
+  pure function of the delivered elapsed; resident re-access did not
+  re-fire.
+- **Bar 4 — PASS `[measured]`.** 10 entities through a bound of 4: residency
+  never exceeded the bound, zero state loss (write-through makes eviction a
+  lossless drop by construction).
+
+**Reversal condition: not triggered** — no blocking hook was confirmed
+because the chosen boundary never touches the registry. The adversarial pass
+(JOURNEY.md) resolved placement to an `imps/persist`-shaped glue module
+`[judgment]`, with a registered follow-on reversal: real two-tier
+inconsistency bugs or measured dispatch-latency damage from bounded IO in
+awareness moves the boundary into the harness.
+
+**Graduation direction: design** — the snapshot/restore contract (one
+envelope per entity: codec bytes + last-active stamp; write-through *is* the
+snapshot), wake-hook semantics (per-entity on rehydration; imp-level as a
+pre-`Run` gate), and the eviction/rehydration boundary are all specified and
+measured; the backend stays uncommitted behind the reference implementation.
