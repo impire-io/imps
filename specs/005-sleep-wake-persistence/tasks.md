@@ -9,13 +9,13 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Write `persist/doc.go` package documentation per the `contracts/go-api.md` documentation contract: the two-tier memory rule (registry = ephemeral/rebuildable, store = durable/loss-is-a-bug, never synchronized), the wake contract (exactly-once per rehydration, pre-visibility, advance-to-now purity, no write-back), the awareness discipline (at most bounded Get/Update per dispatch), and eviction-never-deletes / Delete-is-the-only-removal
+- [x] T001 Write `persist/doc.go` package documentation per the `contracts/go-api.md` documentation contract: the two-tier memory rule (registry = ephemeral/rebuildable, store = durable/loss-is-a-bug, never synchronized), the wake contract (exactly-once per rehydration, pre-visibility, advance-to-now purity, no write-back), the awareness discipline (at most bounded Get/Update per dispatch), and eviction-never-deletes / Delete-is-the-only-removal
 
 ## Phase 2: Foundational (blocking prerequisites for all user stories)
 
-- [ ] T002 Implement `persist/backend.go`: `ErrNotFound` sentinel, the `Backend` interface (Get/Put/Delete; Delete of an absent key is not an error), and `KVBackend(kv jetstream.KeyValue)` mapping the substrate's not-found to `ErrNotFound`, per `contracts/go-api.md`
-- [ ] T003 [P] Implement `persist/codec.go`: `Codec[T]` and `JSONCodec[T]()` (encoding/json), per `contracts/go-api.md`
-- [ ] T004 [P] Unit tests in `persist/backend_test.go`: `KVBackend` round-trip against embedded NATS (`testutil/natstest`), `ErrNotFound` mapping via `errors.Is`, Delete-absent-not-error; plus a reusable failing-`Backend` stub for error-path tests in later phases
+- [x] T002 Implement `persist/backend.go`: `ErrNotFound` sentinel, the `Backend` interface (Get/Put/Delete; Delete of an absent key is not an error), and `KVBackend(kv jetstream.KeyValue)` mapping the substrate's not-found to `ErrNotFound`, per `contracts/go-api.md`
+- [x] T003 [P] Implement `persist/codec.go`: `Codec[T]` and `JSONCodec[T]()` (encoding/json), per `contracts/go-api.md`
+- [x] T004 [P] Unit tests in `persist/backend_test.go`: `KVBackend` round-trip against embedded NATS (`testutil/natstest`), `ErrNotFound` mapping via `errors.Is`, Delete-absent-not-error; plus a reusable failing-`Backend` stub for error-path tests in later phases
 
 **Checkpoint**: the boundary compiles; every story builds on it.
 
@@ -25,9 +25,9 @@
 
 **Independent Test**: mutate an entity through a running imp, stop it, start a fresh instance, and read the entity back equal under the codec — no replay step, no flush step.
 
-- [ ] T005 [US1] Implement `persist/store.go`: `Store[T]`, `NewStore(name, backend, opts...)` with `WithBound` (default 256, panic on n ≤ 0), `WithWake`, `WithCodec` (default JSON); the envelope (`state` bytes + `last_active`, one JSON value, key `<name>.<entity>`); `Get` (resident hit / rehydrate-with-wake / zero-value never-seen / error surfacing), `Update` (rehydrating Get → fn → write-through → residency refresh), `Delete` (residency + backend), `Resident`; LRU residency with pure-drop eviction; one mutex held across IO; unexported injectable `now`, per `contracts/go-api.md` and research.md D2–D6
-- [ ] T006 [P] [US1] Unit tests in `persist/store_test.go` (part 1): Update-then-raw-backend-read shows the envelope durable before return (write-through); never-seen entity yields zero `T`, no error; failing backend surfaces errors from both `Get` and `Update` (never a silent zero); `Delete` clears residency and backend while eviction alone never deletes; codec override applied (spec US1 scenarios 2–4; SC-006)
-- [ ] T007 [US1] Integration test in `persist/restart_test.go`: the research spike productized — a real imp (`SubjectSource` channel, awareness doing `store.Update` per message) against embedded NATS + KV; stop the imp, start a fresh instance with a fresh store, first access returns state equal under the codec to the pre-stop value with zero startup work (spec US1 scenario 1; SC-001)
+- [x] T005 [US1] Implement `persist/store.go`: `Store[T]`, `NewStore(name, backend, opts...)` with `WithBound` (default 256, panic on n ≤ 0), `WithWake`, `WithCodec` (default JSON); the envelope (`state` bytes + `last_active`, one JSON value, key `<name>.<entity>`); `Get` (resident hit / rehydrate-with-wake / zero-value never-seen / error surfacing), `Update` (rehydrating Get → fn → write-through → residency refresh), `Delete` (residency + backend), `Resident`; LRU residency with pure-drop eviction; one mutex held across IO; unexported injectable `now`, per `contracts/go-api.md` and research.md D2–D6
+- [x] T006 [P] [US1] Unit tests in `persist/store_test.go` (part 1): Update-then-raw-backend-read shows the envelope durable before return (write-through); never-seen entity yields zero `T`, no error; failing backend surfaces errors from both `Get` and `Update` (never a silent zero); `Delete` clears residency and backend while eviction alone never deletes; codec override applied (spec US1 scenarios 2–4; SC-006)
+- [x] T007 [US1] Integration test in `persist/restart_test.go`: the research spike productized — a real imp (`SubjectSource` channel, awareness doing `store.Update` per message) against embedded NATS + KV; stop the imp, start a fresh instance with a fresh store, first access returns state equal under the codec to the pre-stop value with zero startup work (spec US1 scenario 1; SC-001)
 
 **Checkpoint**: US1 is the shippable MVP — durable state across restarts.
 
@@ -37,10 +37,10 @@
 
 **Independent Test**: with an injected clock, prove exactly-once/elapsed/pre-visibility deterministically; across a real stop, prove elapsed ≥ the stop; prove Beacon first-start absence and measured slept-for.
 
-- [ ] T008 [US2] Unit tests in `persist/store_test.go` (part 2), using the injected clock: wake fires exactly once per rehydration with elapsed = now − last_active; the state `fn` sees in `Update` is already woken (pre-visibility); resident hits never fire; evict-then-access fires again with the genuine interval since last activity (no write-back semantics); concurrent `Get`s for the same entity under `-race` fire the wake exactly once (spec US2 scenarios 1–3; SC-002; FR-011)
-- [ ] T009 [US2] Implement `persist/beacon.go`: `Beacon`, `NewBeacon(name, b)`, `Stamp` (now under key `<name>`), `SleptFor` → `(elapsed, ok, err)` with never-stamped → `ok=false` (absence, not zero), backend failures → error, per `contracts/go-api.md`
-- [ ] T010 [P] [US2] Unit tests in `persist/beacon_test.go`: first-ever start reports `ok=false`; stamp → slept-for ≥ the (injected-clock) interval; failing backend surfaces an error (spec US2 scenario 4; SC-004)
-- [ ] T011 [US2] Extend `persist/restart_test.go`: across the real stop, the wake hook's elapsed is ≥ the measured stop duration and wall-clock-bounded, and a `Beacon` stamped at shutdown reports a matching slept-for on the fresh instance (SC-002, SC-004)
+- [x] T008 [US2] Unit tests in `persist/store_test.go` (part 2), using the injected clock: wake fires exactly once per rehydration with elapsed = now − last_active; the state `fn` sees in `Update` is already woken (pre-visibility); resident hits never fire; evict-then-access fires again with the genuine interval since last activity (no write-back semantics); concurrent `Get`s for the same entity under `-race` fire the wake exactly once (spec US2 scenarios 1–3; SC-002; FR-011)
+- [x] T009 [US2] Implement `persist/beacon.go`: `Beacon`, `NewBeacon(name, b)`, `Stamp` (now under key `<name>`), `SleptFor` → `(elapsed, ok, err)` with never-stamped → `ok=false` (absence, not zero), backend failures → error, per `contracts/go-api.md`
+- [x] T010 [P] [US2] Unit tests in `persist/beacon_test.go`: first-ever start reports `ok=false`; stamp → slept-for ≥ the (injected-clock) interval; failing backend surfaces an error (spec US2 scenario 4; SC-004)
+- [x] T011 [US2] Extend `persist/restart_test.go`: across the real stop, the wake hook's elapsed is ≥ the measured stop duration and wall-clock-bounded, and a `Beacon` stamped at shutdown reports a matching slept-for on the fresh instance (SC-002, SC-004)
 
 **Checkpoint**: time-dependent state is safe across sleep at both levels.
 
@@ -50,15 +50,15 @@
 
 **Independent Test**: touch N > bound entities; residency ≤ bound throughout; all N read back correct.
 
-- [ ] T012 [US3] Unit tests in `persist/store_test.go` (part 3): with bound 4 and 10 entities, residency never exceeds 4 during writes or readback and every entity reads back correct after eviction (rehydrated); eviction performs no backend writes or deletes (assert via a counting-`Backend` wrapper); new entities are never rejected at the bound (spec US3 scenarios 1–3; SC-003; FR-006)
+- [x] T012 [US3] Unit tests in `persist/store_test.go` (part 3): with bound 4 and 10 entities, residency never exceeds 4 during writes or readback and every entity reads back correct after eviction (rehydrated); eviction performs no backend writes or deletes (assert via a counting-`Backend` wrapper); new entities are never rejected at the bound (spec US3 scenarios 1–3; SC-003; FR-006)
 
 **Checkpoint**: full M2 behavior complete.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T013 [P] Keep `specs/005-sleep-wake-persistence/quickstart.md` in sync with the implemented API (compile-check its example shape; the contract file governs — drift beyond the contract must be surfaced, not silently adopted)
-- [ ] T014 Byte-identity verification per `contracts/repo-gate.md`: `git diff main -- go.mod go.sum` empty; no root-package `*.go` modified; no `Makefile` or CI diff; the branch's changed-file list confined to `persist/`, `specs/005-sleep-wake-persistence/`, `hq/`, `CLAUDE.md` (SC-005)
-- [ ] T015 Full gate: `make fmt && make test && make lint` plus `make compile-deny` — green across both modules, zero skipped tests (SC-006)
+- [x] T013 [P] Keep `specs/005-sleep-wake-persistence/quickstart.md` in sync with the implemented API (compile-check its example shape; the contract file governs — drift beyond the contract must be surfaced, not silently adopted)
+- [x] T014 Byte-identity verification per `contracts/repo-gate.md`: `git diff main -- go.mod go.sum` empty; no root-package `*.go` modified; no `Makefile` or CI diff; the branch's changed-file list confined to `persist/`, `specs/005-sleep-wake-persistence/`, `hq/`, `CLAUDE.md` (SC-005)
+- [x] T015 Full gate: `make fmt && make test && make lint` plus `make compile-deny` — green across both modules, zero skipped tests (SC-006)
 - [ ] T016 Landing duties in the same change (hq/00-GENESIS/how-we-work.md): move M2 to the roadmap ledger with the outcome, write the journey episode via `/journey-log`, propagate any behavioral drift back into `hq/02-DESIGN/0004-sleep-wake-persistence.md` and flip the anatomy's Memory/Persistence/wake-hook tags to `[V]`, refresh `hq/04-JOURNEY/README.md` "Where things stand", set the spec status to Shipped
 
 ## Dependencies & Execution Order
