@@ -2,7 +2,7 @@
 
 **Feature Branch**: `006-schedule-channels`
 **Created**: 2026-07-27
-**Status**: Draft
+**Status**: Shipped
 **Input**: User description: "Schedule channels per hq/02-DESIGN/0005-schedule-channels.md: the thin imps/schedule package — Channel sugar over the existing StreamSource with a header-only Tick decoder, plus typed Register/Deregister for the thinking/operator tier; the server owns the clock."
 
 **Design source**: [`hq/02-DESIGN/0005-schedule-channels.md`](../../hq/02-DESIGN/0005-schedule-channels.md)

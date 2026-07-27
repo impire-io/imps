@@ -54,7 +54,7 @@
 - [x] T010 [P] Keep `specs/006-schedule-channels/quickstart.md` in sync with the implemented API (contract file governs; drift surfaced, never silently adopted)
 - [x] T011 Byte-identity per `contracts/repo-gate.md`: `git diff main -- go.mod go.sum` empty; no root `*.go`, `Makefile`, or CI diff; changed files confined to `schedule/`, `specs/006-schedule-channels/`, `hq/`, `CLAUDE.md` (SC-004)
 - [x] T012 Full gate: `make fmt && make test && make lint` plus `make compile-deny` — green across both modules, zero skipped tests (SC-005)
-- [ ] T013 Landing duties in the same change (hq/00-GENESIS/how-we-work.md): roadmap M3 → ledger (front → M4), journey episode via `/journey-log`, design doc 0005 → `[V]` with any drift propagated, anatomy schedule-channels `[D]` → `[V]`, journey README index + "Where things stand" refreshed, spec status Shipped
+- [x] T013 Landing duties in the same change (hq/00-GENESIS/how-we-work.md): roadmap M3 → ledger (front → M4), journey episode via `/journey-log`, design doc 0005 → `[V]` with any drift propagated, anatomy schedule-channels `[D]` → `[V]`, journey README index + "Where things stand" refreshed, spec status Shipped
 
 ## Dependencies & Execution Order
 
