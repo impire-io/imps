@@ -66,6 +66,38 @@ framing of the Beacon reverses toward the Beacon as the permanent source.
 
 ## Verdict
 
-<Empty until graduation. Filled by /research-graduate: PASS/FAIL per bar with
-the honest numbers, each load-bearing claim tagged [measured] /
-[mechanism-argument] / [judgment].>
+**Answer: the boundary is a triangle, and feature 005 built the right thing
+under the wrong name.** All three bars passed on 2026-07-27, and the
+disposition survived the owner's teach-back (2026-07-27, this session) with
+the trade-offs laid out explicitly before acceptance.
+
+- **Bar 1 — PASS `[measured]`.** Both scopes pinned from the owners'
+  documents (JOURNEY.md): soulrealm is *silent* on suspend/resume,
+  slept-for, and workload-internal memory, and **constitutionally disclaims
+  durable state** (Article I: never a store of record — that belongs to
+  soulstream); imps' vision owns only the *contract* ("the imp doesn't know
+  it was asleep"; the isolation mechanism is explicitly outside the
+  framework).
+- **Bar 2 — PASS.** Five assignments, five structural discriminators
+  (JOURNEY.md): suspend/resume mechanism and the authoritative slept-for
+  source → soulrealm's future backend seam (a process cannot snapshot
+  itself; no self-stamp is authoritative when no imp code runs at suspend);
+  per-entity durable state, bounded eviction, and advance-by-elapsed code →
+  imps (soulrealm's constitution forbids the first `[measured]`; redeploys
+  make the second irreducible `[mechanism-argument]`; only imp code can
+  advance application state).
+- **Bar 3 — PASS.** Complete disposition, no surface undecided:
+  `persist.Store` + per-entity wake **keep-as-is**; `persist.Beacon`
+  **keep-reframed** as the restart clock (self-reported; interim source,
+  not the sleep signal); the 005 landing's anatomy claims **rewritten**
+  (isolation-snapshot sleep restored as the runtime-owned common case,
+  imp-level snapshot wake honestly `[D]` — it needs mid-process delivery
+  co-designed with the runtime); milestone **split into M2a** (durable
+  memory tier — ships) **and M2b** (snapshot sleep/wake, gated on soulrealm
+  growing suspend/resume plus a co-designed wake-delivery contract). The
+  integration seam is sketched in JOURNEY.md.
+
+**Process note `[judgment]`:** the topic exists because a direction call was
+made without a teach-back; its verdict was therefore withheld for one, and
+the accepted trade-off analysis (including that the `Backend` boundary keeps
+the durable tier's storage home movable later) is part of the record.
