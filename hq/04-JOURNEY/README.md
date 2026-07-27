@@ -15,7 +15,7 @@ load-bearing as the shipped code.
 > [`../00-GENESIS/how-we-work.md`](../00-GENESIS/how-we-work.md); the numbering
 > and index are enforced by `internal/hqlint`.
 
-## Where things stand (2026-07-26)
+## Where things stand (2026-07-27)
 
 **The framework's core is shipped, and the project just moved into `hq/`.** The
 in-process Go substrate — channels (core-subject + JetStream), awareness
@@ -51,20 +51,28 @@ imp's own connection. The harness core's diff for the whole feature is
 **zero** — `go.mod` byte-identical, compile-deny green — and the research
 spike is now the permanent integration suite.
 
-**M2's gate is cleared** ([episode 0005](0005-sleep-wake-persistence.md)):
-the `sleep-wake-persistence` research topic passed its four pre-registered
-bars on 2026-07-26 — again with zero harness changes. Persistence lives
-**beside** the registry (riding it is blocked four ways by documented
-guarantees): a write-through, bounded-LRU store with rehydration-on-access,
-wake fired exactly once per rehydration with true elapsed time, and lossless
-eviction by construction. The design,
-[`../02-DESIGN/0004-sleep-wake-persistence.md`](../02-DESIGN/0004-sleep-wake-persistence.md),
-specifies M2 as the **`imps/persist` package** (no new dependencies, so no
-module boundary), the two-tier memory rule, the envelope contract, the
-imp-level `Beacon`, and a backend-agnostic boundary with NATS KV as
-reference only. M2 is ready for `/speckit-specify`, and M3's dependency on
-settled wake semantics is satisfied. Remaining `[D]`: schedule channels,
-audit emission
+**M2a is shipped, and the boundary that re-scoped it is settled**
+([episode 0005](0005-sleep-wake-persistence.md) →
+[episode 0006](0006-sleep-wake-persistence-shipped.md) →
+[episode 0007](0007-sleep-boundary-with-soulrealm.md)): on 2026-07-26 the
+`sleep-wake-persistence` research topic passed its four pre-registered bars
+and feature `005-sleep-wake-persistence` was built; before it merged, the
+owner's challenge ("I expected soulrealm to handle this") opened the
+`sleep-boundary-with-soulrealm` topic, whose verdict — survived teach-back —
+split the milestone. **M2a** (shipped by 005): the durable memory tier
+beside the registry as the **`imps/persist` package** (zero new
+dependencies, zero root-package changes): a write-through, bounded-LRU
+store (`DefaultBound = 256`) with rehydration-on-access, a per-entity wake
+fired exactly once per rehydration with true elapsed time, lossless
+eviction by construction, and the `Beacon` **restart clock** as the
+interim imp-level elapsed source. **M2b** (new, `[D]`): whole-imp snapshot
+sleep/wake — the runtime's act; soulrealm's hq is today silent on
+suspend/resume and constitutionally disclaims durable state (that belongs
+to soulstream), so M2b is gated on soulrealm declaring suspend/resume plus
+a co-designed mid-process wake-delivery contract. The anatomy now carries
+the honest split: restart path `[V]`, snapshot path `[D]`. Remaining
+`[D]`: schedule channels (M3 — the per-entity wake semantics it needs are
+settled), audit emission (M4), and M2b
 ([`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md)).
 There are no active research topics.
 
@@ -77,3 +85,5 @@ There are no active research topics.
 | 0003 | [Soulstream participation: the join that isn't there](0003-soulstream-participation.md) |
 | 0004 | [M1 ships: soulstream participation as a glue module](0004-soulstream-participation-shipped.md) |
 | 0005 | [Sleep, wake, persistence: beside the registry, not inside it](0005-sleep-wake-persistence.md) |
+| 0006 | [M2a ships: the durable tier, transcribed from measurement](0006-sleep-wake-persistence-shipped.md) |
+| 0007 | [Who owns sleep: the boundary challenge that split M2](0007-sleep-boundary-with-soulrealm.md) |
