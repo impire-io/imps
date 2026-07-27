@@ -14,8 +14,8 @@
 //
 // The store is write-through: Update returns success only after the backend
 // accepted the entity's envelope (codec-encoded state + last-active stamp),
-// so the snapshot is continuous and stopping the imp IS sleeping — there is
-// no flush step whose omission can lose data. Restore is lazy: nothing
+// so the snapshot is continuous and stopping the imp is always safe — there
+// is no flush step whose omission can lose data. Restore is lazy: nothing
 // loads at startup; an entity rehydrates on first access. A never-seen
 // entity yields the zero state with no error; a backend or decode failure
 // yields an error, never a silent zero.
@@ -45,10 +45,16 @@
 // calls per dispatch; anything heavier belongs in thinking. Never loop over
 // entities in awareness.
 //
-// # The Beacon
+// # The Beacon — the restart clock
 //
-// The whole-imp sleep reading: Stamp liveness on a heartbeat and at
+// The whole-imp elapsed reading across stops, deploys, and
+// (heartbeat-bounded) crashes: Stamp liveness on a heartbeat and at
 // shutdown; at startup ask SleptFor and run the imp-level wake step before
 // imp.Run — "a single call, before any channel dispatch resumes". A
-// first-ever start reports absence (ok=false), not a zero sleep.
+// first-ever start reports absence (ok=false), not a zero sleep. The Beacon
+// is a self-report, not the sleep signal: snapshot-suspension of a running
+// imp is the runtime's act, only the suspender knows that interval, and a
+// resume continues mid-Run where no gate re-executes — that wake path is
+// deliberately unbuilt until it is co-designed with the runtime (see
+// hq/02-DESIGN/0004-sleep-wake-persistence.md, "out of scope — M2b").
 package persist

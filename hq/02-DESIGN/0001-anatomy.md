@@ -12,8 +12,8 @@ An imp has five parts: **channels**, **awareness**, **thinking**, **memory**, **
 
 The five parts are all specified here; not all of each part is built yet (see the [`README.md`](README.md) status legend and [`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md)).
 
-- **[V] Built and shipped** (features 001–002): core-subject and JetStream stream channels (subscribe / decode / dispatch), awareness with the three-verdict return, thinking in its own goroutine, per-entity local state (get / set / update), and the outbound action surface — `Request`, `RequestMany`, `Publish`, and `Conn`. The awareness/thinking boundary is compile-enforced (see below). Feature 004 added soulstream channels and `Note`-driven contributions as the `imps/soulstream` glue module; feature 005 added durable per-entity memory, eviction/rehydration, and the wake-hook as the `imps/persist` package — both with the harness core untouched.
-- **[D] Designed, not yet built:** schedule channels and per-action audit records. Each has a defined seam and ships as its own numbered feature.
+- **[V] Built and shipped** (features 001–002): core-subject and JetStream stream channels (subscribe / decode / dispatch), awareness with the three-verdict return, thinking in its own goroutine, per-entity local state (get / set / update), and the outbound action surface — `Request`, `RequestMany`, `Publish`, and `Conn`. The awareness/thinking boundary is compile-enforced (see below). Feature 004 added soulstream channels and `Note`-driven contributions as the `imps/soulstream` glue module; feature 005 added durable per-entity memory, eviction/rehydration, the per-entity rehydration wake, and the restart clock as the `imps/persist` package — both with the harness core untouched.
+- **[D] Designed, not yet built:** schedule channels, per-action audit records, and whole-imp snapshot sleep/wake — the runtime-owned suspend/resume path and its mid-process wake delivery, co-designed with the soulrealm runtime (episode 0007; roadmap M2b). Each has a defined seam and ships as its own numbered feature.
 
 Every requirement below is mandatory when its part is built; the maturity tag says *when*, not *whether*.
 
@@ -125,13 +125,13 @@ Local memory does *not* hold:
 
 All of those live in external services. The imp queries them during thinking when context from outside the immediate moment is needed.
 
-### Persistence and sleep [V]
+### Persistence and sleep [restart path V, snapshot path D]
 
-Local memory survives sleep. Durable-tier state is write-through — the snapshot is continuous, so stopping the imp *is* sleeping and there is nothing to flush. Wall-clock time, however, has passed — the `imps/persist` package supplies the wake readings: a per-entity wake hook fired on rehydration with the elapsed time since that entity's last activity, and the imp-level `Beacon` whose `SleptFor` reading gates `main()` before dispatch starts. Projections that depend on wall-clock decay (EMA, "stable for", "idle since") use them to advance their internal state.
+Sleep proper — snapshot-based suspension of the whole imp, "the imp doesn't know it was asleep" — is the **runtime's** act: the isolation mechanism (in the Impire family, the soulrealm runtime and its backends) freezes and resumes the memory image, and only it can know the suspension interval authoritatively. The framework owns the *contract*: an elapsed reading delivered to imp code before dispatch resumes. That contract's mid-process delivery is deliberately unbuilt **[D]** — it must be co-designed with the runtime's suspend capability (episode 0007; roadmap M2b) — so at the whole-imp level, "sleep is the common case" is the design target, not yet the shipped reality.
 
-Persistence across hard restarts (process death, host loss) is the same mechanism: state rehydrates lazily from the backend on first access, and channel positions replay via durable consumers (feature 004). An isolation mechanism's whole-image snapshot facility (microVMs, containers) remains an infrastructure choice; the Beacon supplies the elapsed reading either way.
+What *is* shipped **[V]** is the restart path: durable-tier state is write-through, so stopping the imp is always safe — the snapshot is continuous and there is nothing to flush. Across stops, deploys, and crashes, state rehydrates lazily from the backend on first access, channel positions replay via durable consumers (feature 004), and the `imps/persist` package supplies two wake readings: the per-entity hook fired on rehydration with the elapsed time since that entity's last activity, and the `Beacon` **restart clock** — a self-reported stamp whose `SleptFor` gates `main()` before `Run`. The Beacon is the interim imp-level elapsed source; the runtime's signal supersedes it when M2b lands.
 
-Sleep is the common case; hard restart is the exception. Both are handled, but sleep is what's optimized for.
+Sleep is the common case; hard restart is the exception. The restart path is shipped; the sleep path is specified and waits on its runtime half.
 
 ## Action
 
@@ -177,9 +177,9 @@ The framework holds no "capability" abstraction. Whatever is on the other end of
 
 There is no startup discovery, no resolved surface, no declared capabilities on the imp's spec, no `HasCapability` check, no `$SRV.INFO` round-trip performed by the framework on the imp's behalf. The framework is smaller than this — and the structural enforcement of the energy gradient does not depend on knowing what's on the other end of a subject.
 
-## The wake-hook [V]
+## The wake-hook [per-entity V, whole-imp snapshot wake D]
 
-Shipped in `imps/persist` at two levels: the durable store fires a per-entity wake hook on every rehydration with the elapsed time since that entity's last activity (exactly once, before the state is observable, never writing back), and the imp-level `Beacon` reports how long the whole imp slept — asked in `main()` before `Run`, which is the "single call, before any channel dispatch resumes". The wake hook is optional; imps that don't need it ignore it.
+The per-entity level is shipped in `imps/persist`: the durable store fires a wake hook on every rehydration with the elapsed time since that entity's last activity (exactly once, before the state is observable, never writing back). At the imp level, the shipped surface is the `Beacon` restart clock — self-reported elapsed across graceful stops, deploys, and (heartbeat-bounded) crashes, asked in `main()` before `Run`. The snapshot-sleep wake — an authoritative, runtime-delivered elapsed reaching imp code *mid-process* after a resume — is **[D]**, gated on the soulrealm runtime growing suspend/resume (roadmap M2b): no self-stamp can be authoritative when no imp code runs at suspend time. The wake hook is optional; imps that don't need it ignore it.
 
 Imps that do need it — anything with EMA decay, "stable for" / "idle since" semantics, debounce windows, time-to-live expirations — use the hook to advance the affected state by the elapsed duration before processing the wake-up message.
 

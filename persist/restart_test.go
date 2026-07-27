@@ -17,9 +17,10 @@ import (
 
 // TestRestart_SurvivalWakeAndBeacon is the research spike (episode 0005)
 // productized: a real imp mutates durable state from awareness, stops
-// (write-through means stopping IS sleeping), and a fresh instance
+// (write-through means stopping is always safe), and a fresh instance
 // rehydrates codec-equal state with the wake hook delivering the true
-// elapsed time; the Beacon measures the same sleep at imp level.
+// elapsed time; the Beacon restart clock measures the same gap at imp
+// level.
 func TestRestart_SurvivalWakeAndBeacon(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -103,7 +104,8 @@ func TestRestart_SurvivalWakeAndBeacon(t *testing.T) {
 		t.Fatalf("processed %d events, want 3", processed.Load())
 	}
 
-	// Stopping IS sleeping: stamp the beacon, shut down, nothing to flush.
+	// Stopping is safe by construction: stamp the beacon, shut down,
+	// nothing to flush.
 	if err := beaconA.Stamp(ctx); err != nil {
 		t.Fatalf("stamp: %v", err)
 	}

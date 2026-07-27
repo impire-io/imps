@@ -1,10 +1,18 @@
-# Episode 0006 — M2 ships: the durable tier, transcribed from measurement (2026-07-26)
+# Episode 0006 — M2a ships: the durable tier, transcribed from measurement (2026-07-26)
+
+*(Written as "M2 ships" on 2026-07-26; before this change merged, the owner
+challenged the framing and the boundary verdict of
+[episode 0007](0007-sleep-boundary-with-soulrealm.md) re-scoped the
+milestone: what shipped here is **M2a** — the durable memory tier and the
+restart clock — while whole-imp snapshot sleep became **M2b**, gated on the
+soulrealm runtime. The paragraphs below record what this feature built,
+with the framing corrections noted where 0007 reversed them.)*
 
 Feature `005-sleep-wake-persistence` landed the same day its research topic
-opened — the second consecutive research-to-shipped single-day cycle. M2,
-"sleep/wake and snapshot persistence," is done, and the pattern from M1
-held: because the spike had already measured the whole boundary,
-implementation was transcription, not discovery.
+opened — the second consecutive research-to-shipped single-day cycle. M2a,
+the durable tier and restart clock, is done, and the pattern from M1 held:
+because the spike had already measured the whole boundary, implementation
+was transcription, not discovery.
 
 **What shipped `[measured]`:** the `imps/persist` package — in the **core
 module**, with **zero new dependencies** (the reference backend uses

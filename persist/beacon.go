@@ -7,10 +7,13 @@ import (
 	"time"
 )
 
-// Beacon is the imp-level sleep clock: an imp-scoped last-active stamp
-// under its own backend key. Stamp liveness on a heartbeat and at shutdown;
-// ask SleptFor at startup and run the imp-level wake step before imp.Run —
-// a single call, before any channel dispatch resumes.
+// Beacon is the imp-level restart clock: an imp-scoped last-active stamp
+// under its own backend key, self-reporting elapsed across graceful stops,
+// deploys, and (heartbeat-bounded) crashes. Stamp liveness on a heartbeat
+// and at shutdown; ask SleptFor at startup and run the imp-level wake step
+// before imp.Run — a single call, before any channel dispatch resumes. It
+// is not the snapshot-sleep signal: only the runtime that suspends an imp
+// can report that interval authoritatively (M2b, runtime-co-designed).
 type Beacon struct {
 	name string
 	b    Backend

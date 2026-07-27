@@ -1,16 +1,27 @@
-# Sleep, Wake, and Per-Entity Persistence
+# Per-Entity Persistence and the Restart Clock
 
-How an imp's per-entity memory survives sleep and restarts: eviction under a
-bound, rehydration on access, a snapshot/restore contract, and wake-hook
-semantics at both the entity and the imp level. This document is the M2
-design (roadmap, "Sleep/wake and snapshot persistence"), graduated from the
-`sleep-wake-persistence` research topic
-([episode 0005](../04-JOURNEY/0005-sleep-wake-persistence.md)). Everything
-here is **[V]** — shipped as feature `005-sleep-wake-persistence`
-([episode 0006](../04-JOURNEY/0006-sleep-wake-persistence-shipped.md)); this
-document describes the package as built and tested. The implementation
-matched this contract with no drift (one addition: the default bound is the
-exported constant `DefaultBound = 256`).
+How an imp's per-entity memory survives stops, deploys, and crashes:
+eviction under a bound, rehydration on access, a snapshot/restore contract,
+the per-entity rehydration wake, and the imp-level restart clock. This
+document is the **M2a** design (roadmap; graduated from the
+`sleep-wake-persistence` research topic,
+[episode 0005](../04-JOURNEY/0005-sleep-wake-persistence.md), and re-scoped
+by the boundary verdict of
+[episode 0007](../04-JOURNEY/0007-sleep-boundary-with-soulrealm.md)).
+Everything here is **[V]** — shipped as feature `005-sleep-wake-persistence`
+([episode 0006](../04-JOURNEY/0006-sleep-wake-persistence-shipped.md)); the
+implementation matched this contract with no drift (one addition: the
+default bound is the exported constant `DefaultBound = 256`).
+
+**Deliberately out of scope — M2b:** whole-imp snapshot sleep and its
+authoritative wake. Suspending and resuming a running imp is the runtime's
+act (in the Impire family, the soulrealm runtime and its isolation
+backends), and only the suspender can supply an authoritative slept-for —
+no imp code runs at suspend time. The imps side of that contract (an
+elapsed reading delivered *mid-process* before dispatch resumes) is `[D]`,
+gated on soulrealm growing suspend/resume and a co-designed wake-delivery
+contract (episode 0007). The `Beacon` below is the **restart clock** — the
+interim, self-reported imp-level elapsed source — not the sleep signal.
 
 The load-bearing finding this design rests on `[measured]`: persistence
 lives **beside** the registry, not inside it. Riding the shipped registry is
@@ -148,12 +159,13 @@ func (b *Beacon) SleptFor(ctx context.Context) (time.Duration, bool, error) // f
   entities never fire it. Eviction followed by re-access fires it again —
   that access IS a new wake of that entity, and the interval is genuinely
   the time since it was last active `[measured]`.
-- **Imp-level** (the Beacon, for isolation-snapshot sleep): the anatomy's
-  contract — "a single call, before any channel dispatch resumes" — is a
-  gate in `main()`: ask `SleptFor`, run the imp's wake hook, then `Run`. The
-  isolation mechanism itself (microVM, container, process) stays an
-  infrastructure choice per the constitution; the Beacon only supplies the
-  elapsed reading it needs.
+- **Imp-level** (the Beacon — the restart clock): the anatomy's contract —
+  "a single call, before any channel dispatch resumes" — is a gate in
+  `main()`: ask `SleptFor`, run the imp's wake hook, then `Run`. This covers
+  graceful stops, deploys, and (heartbeat-bounded) crashes. It does **not**
+  cover snapshot-suspension — a resume continues mid-`Run` and the gate
+  never re-executes; that path is M2b's, co-designed with the runtime
+  (episode 0007).
 
 ### Use from the two tiers
 
@@ -220,7 +232,9 @@ func (b *Beacon) SleptFor(ctx context.Context) (time.Duration, bool, error) // f
 - **Lazy restore over startup replay.** Rehydrate-on-access keeps cold
   starts fast and memory small; an imp that wants warm-up can touch its hot
   entities in `main()`.
-- **The Beacon is explicit, not automatic.** The harness does not know it
-  slept; a stamped clock in the backend is the honest elapsed source, and
-  the pre-`Run` gate satisfies the anatomy's "before any channel dispatch
-  resumes" without a harness hook.
+- **The Beacon is explicit, not automatic — and interim.** The harness does
+  not know it stopped; a stamped clock in the backend is the honest
+  self-reported source, and the pre-`Run` gate satisfies "before any channel
+  dispatch resumes" without a harness hook. When the runtime grows
+  suspend/resume (M2b), its authoritative signal supersedes the Beacon for
+  the sleep path; the Beacon remains the restart clock.

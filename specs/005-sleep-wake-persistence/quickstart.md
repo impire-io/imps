@@ -56,7 +56,7 @@ func main() {
 		}),
 	)
 
-	// The imp-level sleep clock: how long was the whole imp down?
+	// The imp-level restart clock: how long was the whole imp down?
 	beacon := persist.NewBeacon("customer-watcher", backend)
 	if slept, ok, err := beacon.SleptFor(ctx); err != nil {
 		log.Fatal(err)
@@ -117,7 +117,7 @@ func main() {
 	if err := imp.Run(ctx); err != nil {
 		log.Fatal(err)
 	}
-	// Stopping IS sleeping: write-through means there is nothing to flush.
+	// Stopping is always safe: write-through means there is nothing to flush.
 }
 ```
 
