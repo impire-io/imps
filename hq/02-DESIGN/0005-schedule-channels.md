@@ -7,7 +7,14 @@ across long sleeps, and imps adds only a thin convenience surface. This
 document is the M3 design (roadmap, "Schedule channels"), graduated from the
 `schedule-channels` research topic
 ([episode 0008](../04-JOURNEY/0008-schedule-channels.md)). Everything here
-is **[D]** — specified, not yet built.
+is **[V]** — shipped as feature `006-schedule-channels`
+([episode 0009](../04-JOURNEY/0009-schedule-channels-shipped.md)); this
+document describes the package as built and tested. Implementation drift,
+propagated: the server's cron grammar is **six-field with a seconds field**
+("0 0 12 * * *"), alongside `@every <dur>` (minimum 1 s), `@at <RFC3339>`
+one-shots, and the predefined `@hourly`…`@yearly` forms; and `Tick.Next` is
+the header verbatim (RFC3339 on repeating schedules, the server's purge
+marker on final firings).
 
 The load-bearing finding this design rests on `[measured]`: the spike ran
 warm delivery, cold durable catch-up, and TTL-governed expiry through the
@@ -18,8 +25,9 @@ server owns the clock.
 ## The substrate contract (owned by nats-server; consumed, not defined)
 
 - A **schedule** is a message in a stream configured with
-  `AllowMsgSchedules: true`, carrying `Nats-Schedule` (an `@every <dur>` or
-  cron pattern; optional `Nats-Schedule-Time-Zone`), `Nats-Schedule-Target`
+  `AllowMsgSchedules: true`, carrying `Nats-Schedule` (`@every <dur>` — min
+  1 s —, `@at <RFC3339>`, six-field cron with seconds, or a predefined
+  `@hourly`-style form; optional `Nats-Schedule-Time-Zone`, cron only), `Nats-Schedule-Target`
   (the subject ticks are emitted to), and optionally `Nats-Schedule-TTL`
   (stamps every tick `Nats-TTL`, so the server expires stale ticks —
   requires `AllowMsgTTL: true` on the stream), `Nats-Schedule-Rollup`, and
@@ -46,7 +54,7 @@ package schedule // import "github.com/impire-io/imps/schedule"
 type Tick struct {
     Subject   string // the target subject the tick arrived on
     Scheduler string // Nats-Scheduler: the schedule subject that produced it
-    Next      string // Nats-Schedule-Next: when the schedule fires again (RFC3339; empty on final firings)
+    Next      string // Nats-Schedule-Next, verbatim: RFC3339 of the next firing, or the server's purge marker on a final firing
 }
 
 // Channel returns a standard harness ChannelSpec consuming the ticks on

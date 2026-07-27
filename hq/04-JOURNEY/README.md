@@ -15,7 +15,7 @@ load-bearing as the shipped code.
 > [`../00-GENESIS/how-we-work.md`](../00-GENESIS/how-we-work.md); the numbering
 > and index are enforced by `internal/hqlint`.
 
-## Where things stand (2026-07-27)
+## Where things stand (2026-07-28)
 
 **The framework's core is shipped, and the project just moved into `hq/`.** The
 in-process Go substrate — channels (core-subject + JetStream), awareness
@@ -74,18 +74,21 @@ the honest split: restart path `[V]`, snapshot path `[D]`. Remaining
 `[D]`: schedule channels (M3 — the per-entity wake semantics it needs are
 settled), audit emission (M4), and M2b
 ([`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md)).
-**M3's gate is cleared** ([episode 0008](0008-schedule-channels.md)): the
-`schedule-channels` research topic passed its four pre-registered bars on
-2026-07-27 — including the episode-0007 corrective, sibling scopes
-inventoried before design. The primitive is real and literal: JetStream
-message scheduling in the pinned `nats-server v2.14.0`, with
-`Nats-Schedule-TTL` making the server itself expire stale ticks. The spike
-measured warm delivery, cold durable catch-up, and TTL-governed
-accumulation through the existing `StreamSource` with zero harness
-changes. The design,
-[`../02-DESIGN/0005-schedule-channels.md`](../02-DESIGN/0005-schedule-channels.md),
-specifies M3 as the thin **`imps/schedule` package** and is ready for
-`/speckit-specify`. There are no active research topics.
+**M3 is shipped** ([episode 0008](0008-schedule-channels.md) →
+[episode 0009](0009-schedule-channels-shipped.md)): the primitive is real
+and literal — JetStream message scheduling in the pinned
+`nats-server v2.14.0`, with `Nats-Schedule-TTL` making the server itself
+expire stale ticks — and feature `006-schedule-channels` landed as the
+thin **`imps/schedule` package**: `Channel` sugar over the existing
+`StreamSource` with provenance-carrying header-only `Tick` decode, typed
+`Register`/`Deregister` (six-field-cron grammar measured and documented),
+no timers, no tick production, no registry. The vision's channel taxonomy
+is now fully `[V]`: external, soulstream, and schedule channels — four
+packages riding seams of a harness core unchanged since feature 002.
+Remaining `[D]`: audit emission (M4 — needs its design doc) and whole-imp
+snapshot sleep (M2b — externally gated on soulrealm)
+([`../03-IMPLEMENTATION/roadmap.md`](../03-IMPLEMENTATION/roadmap.md)).
+There are no active research topics.
 
 ## Episode index
 
@@ -99,3 +102,4 @@ specifies M3 as the thin **`imps/schedule` package** and is ready for
 | 0006 | [M2a ships: the durable tier, transcribed from measurement](0006-sleep-wake-persistence-shipped.md) |
 | 0007 | [Who owns sleep: the boundary challenge that split M2](0007-sleep-boundary-with-soulrealm.md) |
 | 0008 | [Schedule channels: the server already owns the clock](0008-schedule-channels.md) |
+| 0009 | [M3 ships: an imp on the clock it doesn't own](0009-schedule-channels-shipped.md) |

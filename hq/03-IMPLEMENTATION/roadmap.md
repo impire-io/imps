@@ -29,41 +29,14 @@ milestone below, gated on the soulrealm runtime. The next milestone, M3
 (schedule channels), had two gates: settled wake semantics — M2a settles the
 per-entity half, which is what schedule-tick TTL accumulation needs — and
 its own design doc plus the server-side scheduling primitive on the target
-substrate. **Update 2026-07-27: M3 is ready to open** — the `schedule-channels`
-research topic concluded ([episode 0008](../04-JOURNEY/0008-schedule-channels.md)):
-the primitive is real (JetStream message scheduling in the pinned
-`nats-server v2.14.0`), the spike measured warm delivery, cold catch-up,
-and TTL-governed expiry through the existing `StreamSource` with zero
-harness changes, and the design doc,
-[`../02-DESIGN/0005-schedule-channels.md`](../02-DESIGN/0005-schedule-channels.md),
-is written for `/speckit-specify`. The next act is opening the numbered
-feature from it.
+substrate. **Update 2026-07-27/28: M3 landed** as feature `006-schedule-channels`
+([episode 0009](../04-JOURNEY/0009-schedule-channels-shipped.md)) — see the
+ledger. The next milestones are **M4** (audit emission — needs its design
+doc) and **M2b** (whole-imp snapshot sleep — externally gated on soulrealm
+declaring suspend/resume). The front reopens when M4's design doc exists or
+M2b's external gate moves.
 
 ## Next — the declared, unbuilt parts of an imp
-
-### M3. Schedule channels
-
-Periodic work as a channel kind fed by NATS server-side scheduling; TTLs govern
-whether stale ticks accumulate across long sleeps (vision "Periodic work uses
-NATS server-side scheduling"; anatomy, Channels — Schedule channels `[D]`).
-
-The research pinned the milestone's shape: the primitive is **JetStream
-message scheduling** (schedules are headered messages; ticks are ordinary
-messages with `Nats-Scheduler` provenance; `Nats-Schedule-TTL` makes the
-server expire stale ticks itself), so M3 ships as a thin `imps/schedule`
-package — `Channel` sugar over the existing `StreamSource` plus typed
-`Register`/`Deregister` — with the harness untouched and no timers, tick
-production, or schedule registry in the framework.
-
-- *Gate:* **met (2026-07-27)** — design doc
-  [`0005-schedule-channels.md`](../02-DESIGN/0005-schedule-channels.md),
-  plus the primitive verified in the pinned substrate's own source and
-  behavior (episode 0008).
-- *Exit:* a registered schedule fires whether the imp is warm or cold, dispatch
-  is identical to other channel kinds, and stale-tick accumulation is governed
-  by an explicit TTL; harness core and its `go.mod` byte-identical; gate green
-  including `compile-deny`. (The M2-wake-semantics dependency was settled by
-  M2a, episodes 0006/0007.)
 
 ### M4. Audit emission
 
@@ -134,6 +107,7 @@ would violate "capabilities are external; the harness is small."
 | `001-harness-core` | The in-process Go substrate: channels (core-subject + JetStream), awareness dispatch, thinking invocation, per-entity local memory, action publishing; the awareness/thinking boundary compile-enforced. | [0001](../04-JOURNEY/0001-founding-the-harness.md) |
 | `002-capability-client` | The outbound NATS surface: `Request` / `RequestMany` / `Publish` / `Conn`, literal subjects, byte-shaped, no framework codec or retry. | [0001](../04-JOURNEY/0001-founding-the-harness.md) |
 | `004-soulstream-participation` | M1: soulstream topics as channels via the `imps/soulstream` nested glue module — `TopicChannel` on the existing `StreamSource`, the `Note`→`comment.add` bridge, `Participant` on the imp's own connection; harness core byte-identical. | [0004](../04-JOURNEY/0004-soulstream-participation-shipped.md) |
+| `006-schedule-channels` | M3: schedule channels as the `imps/schedule` package — `Channel` sugar over the existing `StreamSource` with header-only `Tick` decode, typed `Register`/`Deregister` over JetStream message scheduling, TTL-governed stale ticks server-side; no timers, no registry, root package untouched. | [0009](../04-JOURNEY/0009-schedule-channels-shipped.md) |
 | `005-sleep-wake-persistence` | **M2a**: the durable memory tier and restart clock as the `imps/persist` package — bounded write-through store with rehydration-on-access and exactly-once per-entity wake, the `Beacon` restart clock, backend-agnostic boundary (JetStream KV reference); zero new dependencies, root package untouched. Re-scoped from "M2" by the episode-0007 boundary verdict (snapshot sleep = M2b, runtime-gated). | [0006](../04-JOURNEY/0006-sleep-wake-persistence-shipped.md), [0007](../04-JOURNEY/0007-sleep-boundary-with-soulrealm.md) |
 
 The post-001/002 refactor sweep (package flattened to the module root, `Wake`→`Think`,
