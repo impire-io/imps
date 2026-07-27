@@ -68,6 +68,38 @@ rather than being worked around quietly.
 
 ## Verdict
 
-<Empty until graduation. Filled by /research-graduate: PASS/FAIL per bar with
-the honest numbers, each load-bearing claim tagged [measured] /
-[mechanism-argument] / [judgment].>
+**Answer: yes — the primitive is real, it is JetStream message scheduling,
+and the seam needs zero harness changes.** All four bars passed on
+2026-07-27, the topic's opening day.
+
+- **Bar 1 — PASS `[measured]`.** The pinned `nats-server v2.14.0` ships
+  message scheduling (JOURNEY.md, with `file:line` into the pinned module
+  source): a schedule is a headered message in an `AllowMsgSchedules`
+  stream (`Nats-Schedule` pattern — `@every`/cron —, `-Target`, optional
+  `-TTL`/`-Time-Zone`/`-Rollup`/`-Source`); ticks are ordinary messages on
+  the target subject with `Nats-Scheduler` provenance; a schedule's TTL
+  stamps every tick `Nats-TTL` so the server itself expires stale ones.
+  The pinned `nats.go v1.52.0` client exposes both stream flags.
+- **Bar 2 — PASS `[measured]`.** The spike (3 consecutive `-race` runs,
+  imps tree byte-identical): server-side schedules fired into subjects an
+  imp consumed through the **existing `StreamSource`** — live while warm,
+  durable-consumer catch-up after a 5 s cold gap — dispatch identical to
+  any channel, zero failures.
+- **Bar 3 — PASS `[measured]`, both directions.** No-TTL schedule: full
+  cold backlog delivered (≥3 ticks). 2 s-TTL schedule: strictly fewer —
+  only the unexpired tail (1–4) — expired server-side, no imp-side
+  filtering.
+- **Bar 4 — PASS `[measured]`.** Sibling scopes pinned: soulrealm's
+  "scheduling" is workload placement (fleet) and an untriggered `job`
+  lifecycle shape; soulstream's "periodic" is persona-run library routines.
+  Neither claims periodic-tick production; the substrate owns it. A
+  complementary future note recorded: a schedule tick could trigger a
+  soulrealm `job`.
+
+**Reversal condition: not triggered** — the primitive exists on the pinned
+substrate, so no vision-level escalation is needed. **Graduation direction:
+design** — a minimal `imps/schedule` package (core module, zero new deps):
+`Channel` sugar over the existing `StreamSource` with a header-only `Tick`
+decoder, plus `Register`/`Deregister` header-builders for the
+thinking/operator tier `[judgment]`, documentation-only having been argued
+and rejected for leaving six magic headers to every imp author.
