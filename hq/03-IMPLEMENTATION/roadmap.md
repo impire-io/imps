@@ -29,7 +29,15 @@ milestone below, gated on the soulrealm runtime. The next milestone, M3
 (schedule channels), had two gates: settled wake semantics — M2a settles the
 per-entity half, which is what schedule-tick TTL accumulation needs — and
 its own design doc plus the server-side scheduling primitive on the target
-substrate. The front reopens when that design doc exists.
+substrate. **Update 2026-07-27: M3 is ready to open** — the `schedule-channels`
+research topic concluded ([episode 0008](../04-JOURNEY/0008-schedule-channels.md)):
+the primitive is real (JetStream message scheduling in the pinned
+`nats-server v2.14.0`), the spike measured warm delivery, cold catch-up,
+and TTL-governed expiry through the existing `StreamSource` with zero
+harness changes, and the design doc,
+[`../02-DESIGN/0005-schedule-channels.md`](../02-DESIGN/0005-schedule-channels.md),
+is written for `/speckit-specify`. The next act is opening the numbered
+feature from it.
 
 ## Next — the declared, unbuilt parts of an imp
 
@@ -39,11 +47,23 @@ Periodic work as a channel kind fed by NATS server-side scheduling; TTLs govern
 whether stale ticks accumulate across long sleeps (vision "Periodic work uses
 NATS server-side scheduling"; anatomy, Channels — Schedule channels `[D]`).
 
-- *Gate:* a schedule-channel design doc, plus the server-side scheduling
-  primitive available on the target substrate.
+The research pinned the milestone's shape: the primitive is **JetStream
+message scheduling** (schedules are headered messages; ticks are ordinary
+messages with `Nats-Scheduler` provenance; `Nats-Schedule-TTL` makes the
+server expire stale ticks itself), so M3 ships as a thin `imps/schedule`
+package — `Channel` sugar over the existing `StreamSource` plus typed
+`Register`/`Deregister` — with the harness untouched and no timers, tick
+production, or schedule registry in the framework.
+
+- *Gate:* **met (2026-07-27)** — design doc
+  [`0005-schedule-channels.md`](../02-DESIGN/0005-schedule-channels.md),
+  plus the primitive verified in the pinned substrate's own source and
+  behavior (episode 0008).
 - *Exit:* a registered schedule fires whether the imp is warm or cold, dispatch
   is identical to other channel kinds, and stale-tick accumulation is governed
-  by an explicit TTL. Depends on M2's wake semantics being settled.
+  by an explicit TTL; harness core and its `go.mod` byte-identical; gate green
+  including `compile-deny`. (The M2-wake-semantics dependency was settled by
+  M2a, episodes 0006/0007.)
 
 ### M4. Audit emission
 
