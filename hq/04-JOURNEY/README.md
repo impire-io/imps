@@ -103,3 +103,4 @@ There are no active research topics.
 | 0007 | [Who owns sleep: the boundary challenge that split M2](0007-sleep-boundary-with-soulrealm.md) |
 | 0008 | [Schedule channels: the server already owns the clock](0008-schedule-channels.md) |
 | 0009 | [M3 ships: an imp on the clock it doesn't own](0009-schedule-channels-shipped.md) |
+| 0010 | [imps goes fair-code](0010-fair-code-license.md) |
