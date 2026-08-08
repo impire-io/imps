@@ -14,6 +14,6 @@ requires an agreement. Public explanation:
 - Sole authorship verified (`git shortlog -sne`: one author, two email
   identities) before the change.
 
-Reversal condition: ecosystem-wide — see soul-hq journey 0064; if
+Reversal condition: ecosystem-wide — see soul-hq journey 0065; if
 fair-code suppresses the adoption the framework exists for, MIT
 returns.
